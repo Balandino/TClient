@@ -7,8 +7,8 @@ public class Tester {
 
 	public static void main(String[] args) {
 		TClient client = new TClient();
-		client.downloadFile(Paths.get("./Arch ISO/archlinux-2020.07.01-x86_64.iso.torrent"), 
-							Paths.get("./Output/Arch-ISO.iso"), 
+		client.downloadFile(Paths.get("./Debian ISO/debian-10.4.0-amd64-netinst.iso.torrent"), 
+							Paths.get("./Output/Debian-ISO.iso"), 
 							PieceSelectionPolicy.RarestFirst);
 	}
 

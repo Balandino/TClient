@@ -1,10 +1,15 @@
 package org.torrent.nio;
 
 import java.io.IOException;
+import java.math.MathContext;
+import java.net.InetSocketAddress;
 import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.torrent.bencoding.TorrentFile;
 import org.torrent.coredata.PeerManager;
@@ -20,22 +25,32 @@ public class NIOThread extends Thread {
 		//Generate Selector
 		try {
 			Selector selector = Selector.open();
+			while(!nioShutdown) {
+				if(this.torrentsToProcess.size() > 0) {
+					for(TorrentFile tf : this.torrentsToProcess) {
+						SocketChannel channel = SocketChannel.open();
+						channel.configureBlocking(false);
+						channel.socket().setSoTimeout(3);
+						channel.connect(new InetSocketAddress(tf.getTrackerRequest(), tf.getPort()));
+						
+						
+						
+						
+					}
+				
+				
+				
+				
+					System.exit(0);
+				}
+			
+			}
+		
+		
 		} catch (IOException io) {
-			System.out.println("Error: Unable to generate selector.");
+			System.err.println("Error: IO Exception has occured");
 			io.printStackTrace();
 		}
-	
-		
-		while(!nioShutdown) {
-			if(this.torrentsToProcess.size() > 0) {
-				System.out.println("Size: " + this.torrentsToProcess.size());
-				System.exit(0);
-			}
-			
-		}
-			
-			
-		
 	}
 	
 	protected static NIOThread getInstance() {

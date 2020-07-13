@@ -2,6 +2,8 @@ package org.torrent.bencoding;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.torrent.coredata.FlowControls.TorrentStatus;
 
@@ -25,6 +27,21 @@ public class TorrentFile {
 		this.newFileLocation = targetLocation;
 		this.piecePolicy = piecePolicy;
 	}
+	
+	public String getTrackerRequest() {
+		return (String) this.parsedFile.get("announce");
+	}
+	
+	public int getPort() {
+		Matcher matcher = Pattern.compile("\\:([0-9]{4})").matcher(this.getTrackerRequest());
+		if(matcher.find()) {
+			return Integer.valueOf(matcher.group(1));
+		} else {
+			return 6969; //Default tracker port
+		}
+	}
+	
+	
 	
 	
 	private HashMap<String, Object> parsedFile;

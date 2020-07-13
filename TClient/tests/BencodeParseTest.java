@@ -15,7 +15,7 @@ class BencodeParseTest {
 		
 		try {
 			
-			HashMap<String, Object> parsedFile = (HashMap<String, Object>)BencodeParser.parseTorrent(Paths.get("./Arch ISO/archlinux-2020.07.01-x86_64.iso.torrent"));
+			HashMap<String, Object> parsedFile = (HashMap<String, Object>)BencodeParser.parseTorrent(Paths.get("./Debian ISO/debian-10.4.0-amd64-netinst.iso.torrent"));
 			
 			assertEquals(5, parsedFile.size());
 			
