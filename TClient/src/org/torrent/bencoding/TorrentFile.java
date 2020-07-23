@@ -27,16 +27,12 @@ public class TorrentFile {
 		RarestFirst
 	}
 	
-	
-	
-	@SuppressWarnings("unchecked")
 	public TorrentFile(Path torrentFile, Path targetLocation, PieceSelectionPolicy pieceSelectionPolicy) throws IOException {
 		bencodedFile = torrentFile;
-		parsedFile = (HashMap<String, Object>) BencodeParser.parseTorrent(torrentFile);
+		parsedFile = BencodeParser.parseBencoding(torrentFile);
 		newFileLocation = targetLocation;
 		piecePolicy = pieceSelectionPolicy;
 		tracker = new URL((String) parsedFile.get("announce"));
-		
 	}
 	
 	public String getTrackerHostSite() {
@@ -67,7 +63,6 @@ public class TorrentFile {
 	
 	public byte[] getInfoHash() {
 		byte[] hash = new byte[20];
-		
 		try {
 			String bFile = Files.readString(bencodedFile, StandardCharsets.ISO_8859_1);
 			bFile = bFile.substring(bFile.lastIndexOf("4:info") + 6, bFile.length() - 1);

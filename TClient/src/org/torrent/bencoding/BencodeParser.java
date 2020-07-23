@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
+@SuppressWarnings("unchecked")
 public abstract class BencodeParser {
 	
 	// Hide constructor
@@ -17,11 +18,15 @@ public abstract class BencodeParser {
 		
 	}
 	
+
+public static HashMap<String, Object> parseBencoding(byte[] bencodedBytes) throws IOException {
+	return (HashMap<String, Object>)BencodeParser.getNextToken(bencodedBytes, Integer.valueOf(0), Integer.valueOf(0), false, "UTF-8")[0];
+}
 	
-public static Object parseTorrent(Path torrentFile) throws IOException {
-		
-		return BencodeParser.getNextToken(Files.readAllBytes(torrentFile), Integer.valueOf(0), Integer.valueOf(0), false, "UTF-8")[0];
-	}
+	
+public static HashMap<String, Object> parseBencoding(Path bencodedFile) throws IOException {
+		return (HashMap<String, Object>)BencodeParser.getNextToken(Files.readAllBytes(bencodedFile), Integer.valueOf(0), Integer.valueOf(0), false, "UTF-8")[0];
+}
 
 	private static Object[] getNextToken(byte[] torrentBytes, Integer laggingIndex, Integer leadingIndex, boolean piecesEncodingFlag, String piecesEncoding) {
 		
