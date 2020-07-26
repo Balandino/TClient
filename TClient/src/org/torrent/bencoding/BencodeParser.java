@@ -43,20 +43,19 @@ public static HashMap<String, Object> parseBencoding(Path bencodedFile) throws I
 						laggingIndex = leadingIndex += 1; //Move lagging index past colon
 						leadingIndex += tokenLength; //Leading index is now the correct distance ahead
 						
-						
 						String tokenToReturn = null;
 						
 						if(tokenLength == 0) {
 							tokenToReturn = "";
 						} else {
-							// If we are parsing the pieces and an encoding has been specified, use that.  Then set the flag to false
+							// If we are parsing the pieces, then return the bytes only for later processing
 							if(piecesEncodingFlag) {
-								tokenToReturn = new String(Arrays.copyOfRange(torrentBytes, laggingIndex, leadingIndex), Charset.forName(piecesEncoding));
+								//tokenToReturn = new String(Arrays.copyOfRange(torrentBytes, laggingIndex, leadingIndex), Charset.forName(piecesEncoding));
 								piecesEncodingFlag = false;
+								return new Object[] {Arrays.copyOfRange(torrentBytes, laggingIndex, leadingIndex), leadingIndex, piecesEncodingFlag, piecesEncoding};
 							} else {
 								tokenToReturn = new String(Arrays.copyOfRange(torrentBytes, laggingIndex, leadingIndex), StandardCharsets.UTF_8);
 							}
-							
 						}
 						
 						
