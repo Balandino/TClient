@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -40,6 +41,8 @@ public class NIOThread extends Thread {
 	
 	@Override
 	public void run() {
+		//Create an id for our client
+		peerID = this.getSessionPeerID();
 		
 		//Generate Selector
 		try {
@@ -71,11 +74,14 @@ public class NIOThread extends Thread {
 										SocketChannel channel = SocketChannel.open();
 										channel.configureBlocking(false);
 										//System.out.println("IP: " + peer.getIP() + " Port: " + peer.getPort());
-										//channel.connect(new InetSocketAddress(peer.getIP(), peer.getPort()));
-										channel.connect(new InetSocketAddress("5.9.144.2", 54321));
+										
+										//FOR TESTING ONLY
+										peer = new Peer("5.9.144.2", 54321);
+										
+										channel.connect(new InetSocketAddress(peer.getIP(), peer.getPort()));
 										SelectionKey newKey = channel.register(selector, SelectionKey.OP_CONNECT);
 										System.out.println("Registered with selector!");
-										ChannelData channelData = new ChannelData(storesKey, ChannelStatus.CONTACTING_PEER);
+										ChannelData channelData = new ChannelData(storesKey, peer, ChannelStatus.CONTACTING_PEER);
 										tf.addNewDownloadingConn(channel);
 										newKey.attach(channelData);
 									}
@@ -105,17 +111,17 @@ public class NIOThread extends Thread {
 							channel.finishConnect();
 							ChannelData channelData = (ChannelData)key.attachment();
 							
-							if(channelData.getStatus() == ChannelStatus.CONTACTING_PEER) {
-								
-								
-								System.out.println("Code end reached");
-								System.exit(0);
-							}
-							
 							if(channelData.getStatus() == ChannelStatus.CONTACTING_TRACKER) {
 								channelData.setStatus(ChannelStatus.MESSAGING_TRACKER);
 								SelectionKey newKey = channel.register(selector, SelectionKey.OP_WRITE);
 								newKey.attach(channelData);
+							} else if(channelData.getStatus() == ChannelStatus.CONTACTING_PEER) {
+								channelData.setStatus(ChannelStatus.SENDING_HANDSHAKE);
+								SelectionKey newKey = channel.register(selector, SelectionKey.OP_WRITE);
+								newKey.attach(channelData);
+							} else {
+								System.err.println("Unable to parse channel state.");
+								System.exit(0);
 							}
 							
 						} catch (IOException io) {
@@ -136,14 +142,31 @@ public class NIOThread extends Thread {
 							channel = (SocketChannel)key.channel();
 							ByteBuffer buff = ByteBuffer.allocate(4000);//Should be sufficient for average dictionary mode if required
 							channel.read(buff);
+							
 							this.parseTrackerResponse(buff.array(), channelNioKey);
 							this.setPieceSelector(channelNioKey);
 							key.cancel();
 							torrentsProcessing.get(channelNioKey).setStatus(TorrentStatus.MESSAGING_PEERS);
+							
+						} else {
+							ByteBuffer buff = ByteBuffer.allocate(50000);
+							channel.read(buff);
+							
+							//DEBUG
+							Files.write(Paths.get("/home/mkg/Desktop/Handshake"), Arrays.copyOfRange(buff.array(), 0, buff.position()));
+							
+							String result = this.receiveMessage(channelData, Arrays.copyOfRange(buff.array(), 0, buff.position()));
+							
+							System.out.println(result);
+							
+							
+							//TODO End of code
+							System.out.println("Code end reached!");
+							System.exit(0);
 						}
 							
 							
-							 
+							
 						
 					}//Read end
 					
@@ -154,9 +177,14 @@ public class NIOThread extends Thread {
 						ChannelData channelData = (ChannelData)key.attachment();
 						
 						if(channelData.getStatus() == ChannelStatus.MESSAGING_TRACKER) {
-							TorrentFile tFile = torrentsProcessing.get(channelData.getNioKey());
+							TorrentFile tf = torrentsProcessing.get(channelData.getNioKey());
 							channelData.setStatus(ChannelStatus.WAITING_TRACKER_RESPONSE);
-							channel.write(ByteBuffer.wrap(this.getHTTPRequest(tFile).getBytes()));
+							channel.write(ByteBuffer.wrap(this.getHTTPRequest(tf).getBytes()));
+							SelectionKey newKey = channel.register(selector, SelectionKey.OP_READ);
+							newKey.attach(channelData);
+						} else if(channelData.getStatus() == ChannelStatus.SENDING_HANDSHAKE) {
+							channel.write(this.getHandshake(torrentsProcessing.get(channelData.getNioKey())));
+							channelData.setStatus(ChannelStatus.WAITING_HANDSHAKE);
 							SelectionKey newKey = channel.register(selector, SelectionKey.OP_READ);
 							newKey.attach(channelData);
 						}
@@ -167,13 +195,51 @@ public class NIOThread extends Thread {
 				
 			
 			}
-		
-		
 		} catch (IOException io) {
 			System.err.println("Error: IO Exception has occured");
 			io.printStackTrace();
 		}
 	}
+	
+	//String will need to contain an error message if we go wrong,
+	//or something else if all is successful
+	private String receiveMessage(ChannelData channelData, byte[] message) {
+		String messageType = "undefined";
+		if(message.length >= 68) {
+			String messageStart = message[0] + new String( Arrays.copyOfRange(message, 1, 20), StandardCharsets.ISO_8859_1);
+			if(messageStart.equals("19BitTorrent protocol")) {
+				messageType = "Handshake";
+				Peer channelPeer = channelData.getPeer();
+				
+			}
+		}
+		
+		
+		switch (messageType) {
+		case "Handshake": {
+			
+			
+			
+			return "ok"; 
+		}
+		default:
+			return "undefined";
+		}
+	}
+	
+	
+	private ByteBuffer getHandshake(TorrentFile tf) {
+		ByteBuffer buff = ByteBuffer.allocate(68);
+		buff.put((byte) 19); //pstrlen
+		buff.put("BitTorrent protocol".getBytes(StandardCharsets.UTF_8)); //pstr
+		buff.put(new byte[] {0, 0, 0, 0, 0, 0, 0, 0}); //extensions
+		buff.put(tf.getInfoHash()); //infohash
+		buff.put(peerID.toString().getBytes(StandardCharsets.UTF_8));
+		buff.flip();
+		
+		return buff;
+	}
+	
 	
 	protected static NIOThread getInstance() {
 		if (nioThread == null) {
@@ -182,13 +248,12 @@ public class NIOThread extends Thread {
 		return nioThread;
 	}
 	
-	private byte[] getPeerID() {
-		if(peerID.length() < 20) {
-			for(int i = 0; i < 15; i++) {
+	private StringBuilder getSessionPeerID() {
+		peerID.append("-");	
+		for(int i = 0; i < 14; i++) {
 			peerID.append(new Random().nextInt(10));	
-			}
 		}
-		return peerID.toString().getBytes();
+		return peerID;
 	}
 	
 	private int getPort() {
@@ -200,7 +265,7 @@ public class NIOThread extends Thread {
 		String message = "GET " + 
 		tf.getResourceAddress() +
 		"?info_hash=" + this.urlEncode(tf.getInfoHash()) +
-		"&peer_id=" + this.urlEncode(this.getPeerID()) +
+		"&peer_id=" + this.urlEncode(peerID.toString().getBytes()) +
 		"&port=" + this.getPort() +
 		"&downloaded=" + tf.getAmountDownloaded() +
 		"&left=" + tf.getAmountRemaining() +
