@@ -35,7 +35,7 @@ public class ChannelData {
 		return peer;
 	}
 	
-	private ArrayDeque<String> outboundQueue = new ArrayDeque<String>();
+	private ArrayDeque<byte[]> outboundQueue = new ArrayDeque<byte[]>();
 	private long lastMsgReceived;
 	private long interestTimeout;
 	private ChannelStatus channelStatus;

@@ -1,12 +1,12 @@
 package org.torrent.coredata;
 
-public abstract class PieceSelector {
+public abstract class PiecePicker {
 	
-	public abstract int getPiece(byte[] bitfield);
+	public abstract int getPiece(String bitfield);
 	
 	public abstract void processBitField(byte[] bitfield);
 	
-	public abstract boolean pieceAvailable();
+	public abstract boolean pieceAvailable(byte[] bitfield);
 	
 	public abstract boolean endGameStatus();
 	

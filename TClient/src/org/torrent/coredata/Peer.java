@@ -23,8 +23,12 @@ public class Peer {
 		return bitfield;
 	}
 	
-	public void setBitfield(byte[] newBitfield) {
-		bitfield = newBitfield;
+	public void setBitfield(byte[] bitfield) {
+		this.bitfield = bitfield;
+	}
+	
+	public void setHandShake(byte[] handshakeBytes) {
+		handshake = handshakeBytes;
 	}
 	
 	public String getReservedBytes(byte[] handshake) {
@@ -48,6 +52,14 @@ public class Peer {
 		return Arrays.copyOfRange(handshake, 48, 68);
 	}
 	
+	public boolean bitfieldSent() {
+		return bitFieldSent;
+	}
+	
+	public void setBitfieldSent() {
+		bitFieldSent = true;
+	}
+	
 	@Override
 	public String toString() {
 		return String.format("%-15s %s%s", this.getIP(), this.getPort(), System.lineSeparator());
@@ -59,4 +71,5 @@ public class Peer {
 	private String reservedBytes;
 	private byte[] peerID;
 	private byte[] handshake;
+	private boolean bitFieldSent = false;
 }

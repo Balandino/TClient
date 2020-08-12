@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -31,6 +32,9 @@ public class TorrentFile {
 		newFileLocation = targetLocation;
 		piecePolicy = pieceSelectionPolicy;
 		tracker = new URL((String) parsedFile.get("announce"));
+		bitfield = new byte[this.getNumPieces() / 8];
+		Arrays.fill(bitfield, (byte)0);
+		
 		
 		
 		HashMap<String, Object> infoDict = (HashMap<String, Object>) parsedFile.get("info");
@@ -118,6 +122,19 @@ public class TorrentFile {
 		return torrentStatus;
 	}
 	
+	public byte[] getBitfield() {
+		return this.bitfield;
+	}
+	
+	public boolean isBitfieldEmpty() {
+		for(byte b : bitfield) {
+			if(b != (byte)0) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
 	public void setTrackerRefreshTime(long interval) {
 		trackerRefreshTime = System.currentTimeMillis() + interval;
 	}
@@ -136,15 +153,18 @@ public class TorrentFile {
 		numDownloadingConns--;
 	}
 	
+	
 	private HashMap<String, Object> parsedFile;
 	private long trackerRefreshTime;
 	private HashSet<SocketChannel> currentConns = new HashSet<SocketChannel>();
 	private URL tracker;
 	
+	
 	private int numSeedingConns = 0;
 	private int numDownloadingConns = 0;
 	private long amountDownloaded = 0;
 	private long fileSize;
+	private byte[] bitfield;
 	private TorrentStatus torrentStatus;
 	private Path newFileLocation;
 	private PieceSelectionPolicy piecePolicy;

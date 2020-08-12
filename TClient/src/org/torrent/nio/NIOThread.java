@@ -17,11 +17,13 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 
 import org.torrent.bencoding.BencodeParser;
 import org.torrent.bencoding.TorrentFile;
@@ -32,7 +34,7 @@ import org.torrent.coredata.FlowControls.ChannelStatus;
 import org.torrent.coredata.FlowControls.TorrentStatus;
 import org.torrent.coredata.Peer;
 import org.torrent.coredata.PeerManager;
-import org.torrent.coredata.PieceSelector;
+import org.torrent.coredata.PiecePicker;
 import org.torrent.coredata.RarestFirst;
 
 @SuppressWarnings("unused")
@@ -94,7 +96,7 @@ public class NIOThread extends Thread {
 				selector.select(1000);
 				Set<SelectionKey> readyKeys = selector.selectedKeys();
 				Iterator<SelectionKey> iterator = readyKeys.iterator();
-				System.out.println("FLOW: Looping" + " Key count: " + readyKeys.size());
+				//System.out.println("FLOW: Looping" + " Key count: " + readyKeys.size());
 				while(iterator.hasNext()) {
 					SelectionKey key = (SelectionKey) iterator.next();
 					iterator.remove();
@@ -149,20 +151,27 @@ public class NIOThread extends Thread {
 							torrentsProcessing.get(channelNioKey).setStatus(TorrentStatus.MESSAGING_PEERS);
 							
 						} else {
-							ByteBuffer buff = ByteBuffer.allocate(50000);
+							ByteBuffer buff = ByteBuffer.allocate(500000);
 							channel.read(buff);
 							
 							//DEBUG
 							Files.write(Paths.get("/home/mkg/Desktop/Handshake"), Arrays.copyOfRange(buff.array(), 0, buff.position()));
 							
 							String result = this.receiveMessage(channelData, Arrays.copyOfRange(buff.array(), 0, buff.position()));
-							
-							System.out.println(result);
-							
-							
-							//TODO End of code
-							System.out.println("Code end reached!");
-							System.exit(0);
+							if(result.equals("OK")) {
+								//this.processData(channelData);
+								
+								
+								
+
+								//TODO End of code
+								System.out.println("Code end reached!");
+								System.exit(0);
+								
+							} else {
+								System.err.println("Error reading message: " + result);
+								System.exit(0);
+							}
 						}
 							
 							
@@ -201,30 +210,107 @@ public class NIOThread extends Thread {
 		}
 	}
 	
-	//String will need to contain an error message if we go wrong,
-	//or something else if all is successful
-	private String receiveMessage(ChannelData channelData, byte[] message) {
-		String messageType = "undefined";
-		if(message.length >= 68) {
-			String messageStart = message[0] + new String( Arrays.copyOfRange(message, 1, 20), StandardCharsets.ISO_8859_1);
-			if(messageStart.equals("19BitTorrent protocol")) {
-				messageType = "Handshake";
-				Peer channelPeer = channelData.getPeer();
+	private ChannelStatus processData(ChannelData channelData) {
+		ChannelStatus status = channelData.getStatus();
+		Integer channelNioKey = channelData.getNioKey();
+		
+		
+		
+		if(status == ChannelStatus.CHECKING_FOR_PIECE) {
+			PiecePicker picker = PiecePickers.get(channelNioKey);
+			if(picker.pieceAvailable(channelData.getPeer().getBitfield())) {
 				
 			}
+			
+			
 		}
 		
 		
-		switch (messageType) {
-		case "Handshake": {
+		
+		
+		return null;
+	}
+	
+	
+	
+	//String will need to contain an error message if we go wrong,
+	//or something else if all is successful
+	private String receiveMessage(ChannelData channelData, byte[] msgData) {
+		String result = "OK";
+		Integer channelNioKey = channelData.getNioKey();
+		LinkedHashMap<Byte, byte[]> messages = this.extractMessages(msgData);
+		
+		for(byte msgID : messages.keySet()) {
+			
+			switch (msgID) {
+				case (byte)19: {
+					channelData.getPeer().setHandShake(messages.get(msgID));
+					channelData.setStatus(ChannelStatus.SENDING_BITFIELD);
+					break;
+				}
+				
+				case (byte)5:{
+					channelData.getPeer().setBitfield(messages.get(msgID));
+					PiecePicker picker = PiecePickers.get(channelNioKey);
+					picker.processBitField(channelData.getPeer().getBitfield());
+					
+					TorrentFile tf = torrentsProcessing.get(channelNioKey);
+					if(!channelData.getPeer().bitfieldSent()) {
+						if(!tf.isBitfieldEmpty()) {
+							//Add bitfield to outbound Queue
+							
+							channelData.getPeer().setBitfieldSent();
+						}
+					}
+						
+					channelData.setStatus(ChannelStatus.CHECKING_FOR_PIECE);
+					break;
+				}
+				
+				case (byte)1:{
+					//Process unchoked message
+					
+					
+					break;
+				}
+				
+				
+				
+				default:
+					System.err.println("Error: Unable to parse message, exiting");
+					System.exit(0);
+				}
+				
+				
 			
 			
 			
-			return "ok"; 
 		}
-		default:
-			return "undefined";
+		return result;
+	}
+	
+	private LinkedHashMap<Byte, byte[]> extractMessages(byte[] message){
+		LinkedHashMap<Byte, byte[]> messages = new LinkedHashMap<Byte, byte[]>();
+		
+		int index = 0;
+		while(index < message.length) {
+		
+			if(message.length >= 68 && index == 0) {
+				String messageStart = message[0] + new String(Arrays.copyOfRange(message, 1, 20), StandardCharsets.ISO_8859_1);
+				if(messageStart.equals("19BitTorrent protocol")) {
+					messages.put((byte) 19, Arrays.copyOfRange(message, 0, 68));
+					index = 68;
+				} 
+			}
+			
+			ByteBuffer buff = ByteBuffer.wrap(Arrays.copyOfRange(message, index, index + 4));
+			int messageLength = buff.getInt();
+			index += 4;
+			
+			messages.put(message[index], Arrays.copyOfRange(message, index + 1, (index + messageLength)));
+			index += messageLength;
 		}
+		return messages;
 	}
 	
 	
@@ -284,7 +370,7 @@ public class NIOThread extends Thread {
 		PieceSelectionPolicy policy = torrentsProcessing.get(channelNioKey).getPieceSelectionPolicy();
 		TorrentFile tf = torrentsProcessing.get(channelNioKey);
 		if(policy == PieceSelectionPolicy.RarestFirst) {
-			pieceSelectors.put(channelNioKey, new RarestFirst(tf.getNumPieces(), tf.getFinalPieceSize()));
+			PiecePickers.put(channelNioKey, new RarestFirst(tf.getNumPieces(), tf.getFinalPieceSize()));
 		} else {
 			System.err.println("Error: No piece selection policy set");
 			System.exit(0);
@@ -362,9 +448,8 @@ public class NIOThread extends Thread {
 		
 	private HashMap<Integer, TorrentFile> torrentsProcessing = new HashMap<Integer, TorrentFile>();
 	private HashMap<Integer, PeerManager> peerManagers = new HashMap<Integer, PeerManager>();
-	private HashMap<Integer, PieceSelector> pieceSelectors  = new HashMap<Integer, PieceSelector>();
+	private HashMap<Integer, PiecePicker> PiecePickers  = new HashMap<Integer, PiecePicker>();
 	private Integer nioKey = 0;
-	private byte[] handshake;
 	private static NIOThread nioThread = null;
 	private StringBuilder peerID = new StringBuilder("TM470");
 	private int myListeningPort = 6888;
