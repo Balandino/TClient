@@ -16,11 +16,18 @@ public class RarestFirst extends PiecePicker {
 	}
 
 	@Override
-	public int getPiece(String bitfield) {
-		// TODO Auto-generated method stub
-		return 0;
+	public int getPiece(byte[] bitfield) {
+		int chosenPiece = 0;
+		for(int i = 0; i < pieces.length; i++) {
+			if(this.checkBit(pieces[i][0], bitfield)) {
+				chosenPiece = pieces[i][0];
+				piecesInProgress.add(pieces[i][0]);
+				break;
+			}
+		}
+		return chosenPiece;
 	}
-
+	
 	@Override
 	public void processBitField(byte[] bitfield) {
 		for(int i = 0; i < pieces.length; i++) {
@@ -51,14 +58,19 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public boolean pieceAvailable(byte[] bitfield) {
-		// TODO Auto-generated method stub
+		for(int i = 0; i < pieces.length; i++) {
+			if(this.checkBit(pieces[i][0], bitfield)) {
+				if(!piecesInProgress.contains(pieces[i][0])) {
+					return true;
+				}
+			}
+		}
 		return false;
 	}
 	
 	@Override
-	public boolean endGameStatus() {
-		// TODO Auto-generated method stub
-		return false;
+	public boolean endGameEnabled() {
+		return endGame;
 	}
 
 	@Override
@@ -123,7 +135,7 @@ public class RarestFirst extends PiecePicker {
 	}
 	
 	private int[][] pieces;
-	private HashSet<Integer> piecesInProgress;
+	private HashSet<Integer> piecesInProgress = new HashSet<Integer>();
 	private int piecesObtainedCount;
 	private int totalNumPieces;
 	private long finalPieceSize;

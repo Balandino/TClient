@@ -68,8 +68,9 @@ public class Peer {
 	private String ip;
 	private int port;
 	private byte[] bitfield;
-	private String reservedBytes;
-	private byte[] peerID;
+//	private String reservedBytes;
+//	private byte[] peerID;
+	@SuppressWarnings("unused")
 	private byte[] handshake;
 	private boolean bitFieldSent = false;
 }
