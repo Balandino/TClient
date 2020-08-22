@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -140,7 +141,6 @@ public class NIOThread extends Thread {
 						int channelNioKey = channelData.getNioKey();
 						
 						
-						
 						if(channelData != null){
 							if(channelData.getStatus() == ChannelStatus.PROCESSING_MESSAGES) {
 								
@@ -148,10 +148,10 @@ public class NIOThread extends Thread {
 								channel.read(buff);
 								Files.write(Paths.get("/home/mkg/Desktop/Received.txt"), Arrays.copyOfRange(buff.array(), 0, buff.position()));
 								
-								this.hexPrint(Arrays.copyOfRange(buff.array(), 0, buff.position()));
+								//this.hexPrint(Arrays.copyOfRange(buff.array(), 0, buff.position()));
 								
 								debugCount++;
-								if(debugCount > 4) {
+								if(debugCount > 10) {
 									//TODO End of code
 									System.out.println("Code end reached!");
 									System.exit(0);
@@ -159,7 +159,6 @@ public class NIOThread extends Thread {
 							}
 						}
 						if(debugCount < 1) {
-							
 						
 						
 						
@@ -225,19 +224,8 @@ public class NIOThread extends Thread {
 							 * 
 							 * 
 							 */
-							//channel.write(ByteBuffer.wrap(channelData.getOutboundMessages()));
-							
-							
-							
-							
-							ByteBuffer buff = ByteBuffer.wrap(channelData.getOutboundMessage());
-							
-							Files.write(Paths.get("/home/mkg/Desktop/Outbound.txt"), buff.array());
-							
+							//ByteBuffer buff = ByteBuffer.wrap(channelData.getOutboundMessage());
 							this.writeMessage(channel, channelData.getOutboundMessages());
-							
-							
-							
 							
 							
 							
@@ -259,18 +247,16 @@ public class NIOThread extends Thread {
 	
 	
 	
-	
 	/*==================================*\	
-	 *		Return value to Key mapping *
-	 * =================================*
+	 *	  Return value to Key mapping   *
+	 *==================================*
 	 * 		     Accept: 16				*
 	 * 		       Read: 1				*
 	 * 	          Write: 4				*
 	 *   		Connect: 8				*
 	 *  Write & Connect: 5				*
 	\*==================================*/
-		
-		
+	
 	private int processData(ChannelData channelData) {
 		while(true) {
 			ChannelStatus status = channelData.getStatus();
@@ -281,13 +267,14 @@ public class NIOThread extends Thread {
 			if(status == ChannelStatus.CHECKING_FOR_PIECE) {
 				picker = PiecePickers.get(channelNioKey);
 				if(picker.pieceAvailable(channelData.getPeer().getBitfield())) {
+					byte[] interested = new byte[] {0, 0, 0, 1, 2};
+					channelData.addMessage(interested);
+					
 					if(!channelData.isChoked()) {
 						channelData.setStatus(ChannelStatus.PROCESSING_MESSAGES);	
 						continue;
 					} else {
 						//TODO Need to add interested message
-						byte[] interested = new byte[] {0, 0, 0, 1, 2};
-						channelData.addMessage(interested);
 						channelData.setStatus(ChannelStatus.PROCESSING_MESSAGES);
 						return SelectionKey.OP_WRITE;
 					}
@@ -332,7 +319,6 @@ public class NIOThread extends Thread {
 				break;
 			}
 			
-		
 		}
 		
 		return -1;
@@ -347,7 +333,6 @@ public class NIOThread extends Thread {
 		LinkedHashMap<Byte, byte[]> messages = this.extractMessages(msgData);
 		
 		for(byte msgID : messages.keySet()) {
-			
 			
 			switch (msgID) {
 				case (byte)19: {
@@ -374,9 +359,7 @@ public class NIOThread extends Thread {
 				}
 				
 				case (byte)1:{
-					if(channelData.isInterested()) {
 						channelData.setUnchoked();
-					} 
 					break;
 				}
 				
@@ -390,30 +373,33 @@ public class NIOThread extends Thread {
 	}
 	
 	private void writeMessage(SocketChannel channel, byte[] message) throws IOException {
-		System.out.println("Message Out!");
-		this.hexPrint(message);
 		channel.write(ByteBuffer.wrap(message));
 	}
 	
 	//DEBUG 
 	private void hexPrint(byte[] bytes) {
 		for(byte b : bytes) {
-			System.out.print(String.format("%-2s", Integer.toHexString(((byte)b) & 0xFF).toUpperCase()) + " ");
+			//System.out.print(String.format("%-2s", Integer.toHexString(((byte)b) & 0xFF).toUpperCase()) + " ");
+			System.out.print(String.format("%02X", ((byte)b) & 0xFF).toUpperCase() + " ");
 		}
 		System.out.println();
 	}
 	
 	
-	private LinkedHashMap<Byte, byte[]> extractMessages(byte[] message){
-		LinkedHashMap<Byte, byte[]> messages = new LinkedHashMap<Byte, byte[]>();
+	private ArrayDeque<byte[]> extractMessages(byte[] message){
+		ArrayDeque<byte[]> messages = new ArrayDeque<byte[]>();
 		
 		int index = 0;
+		int count = 0;
 		while(index < message.length) {
 		
 			if(message.length >= 68 && index == 0) {
 				String messageStart = message[0] + new String(Arrays.copyOfRange(message, 1, 20), StandardCharsets.ISO_8859_1);
 				if(messageStart.equals("19BitTorrent protocol")) {
-					messages.put((byte) 19, Arrays.copyOfRange(message, 0, 68));
+					byte[] handshake = new byte[69];
+					handshake[0] = 19;
+					System.arraycopy(Arrays.copyOfRange(message, 0, 68), 0, handshake, 1, 68);
+		//			messages.put((byte) 19, Arrays.copyOfRange(message, 0, 68));
 					index = 68;
 				} 
 			}
@@ -422,7 +408,7 @@ public class NIOThread extends Thread {
 			int messageLength = buff.getInt();
 			index += 4;
 			
-			messages.put(message[index], Arrays.copyOfRange(message, index + 1, (index + messageLength)));
+		//	messages.put(message[index], Arrays.copyOfRange(message, index + 1, (index + messageLength)));
 			index += messageLength;
 		}
 		return messages;

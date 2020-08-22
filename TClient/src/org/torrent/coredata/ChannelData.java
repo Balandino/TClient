@@ -149,14 +149,17 @@ public class ChannelData {
 		
 		byte[][] requests = new byte[totalReqs][17];
 		for(int i = 0; i < totalReqs; i++) {
-			requests[i][0] = (byte)0;
-			requests[i][1] = (byte)0;
-			requests[i][2] = (byte)0;
-			requests[i][3] = (byte)13;
+			System.arraycopy(this.getIntBytes(13), 0, requests[i], 0, 4);
 			requests[i][4] = (byte)6;
+			
 			System.arraycopy(this.getIntBytes(piece), 0, requests[i], 5, 4);
 			System.arraycopy(this.getIntBytes(i * blockReqSize), 0, requests[i], 9, 4);
-			System.arraycopy(this.getIntBytes(blockReqSize), 0, requests[i], 13, 4);
+			
+			if(i == (totalReqs - 1) && (pieceSize % blockReqSize) != 0) {
+				System.arraycopy(this.getIntBytes(pieceSize % blockReqSize), 0, requests[i], 13, 4);
+			} else {
+				System.arraycopy(this.getIntBytes(blockReqSize), 0, requests[i], 13, 4);
+			}
 		}
 		
 		blocksRequested = new byte[totalReqs];
