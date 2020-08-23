@@ -136,15 +136,13 @@ public class ChannelData {
 	}
 	
 	public byte[][] getBlockRequests(int pieceSize, int piece, int blockReqSize) {
-		if(blocks != null) {
+		if(blocksCollected != null) {
 			return blockRequests;
 		}
-		blocks = ByteBuffer.allocate(pieceSize);
+		blocksCollected = ByteBuffer.allocate(pieceSize);
 				
-		
-		//TODO blocks == null
 		blockReqSize = Math.min(blockReqSize, pieceSize);
-		int[] numReqs = this.numRequestsReq(blocks, blockReqSize);
+		int[] numReqs = this.numRequestsReq(blocksCollected, blockReqSize);
 		int totalReqs = numReqs[0] + (numReqs[1] == 0 ? 0 : 1);
 		
 		byte[][] requests = new byte[totalReqs][17];
@@ -180,7 +178,13 @@ public class ChannelData {
 	public void setBlockRequested(int index) {
 		blocksRequested[index] = 1;
 	}
-
+	
+	public void setBlockObtained(byte[] offset, int pieceSize, int blockReqSize) {
+		int offsetIndex = ByteBuffer.wrap(offset).getInt();
+		blockReqSize = Math.min(blockReqSize, pieceSize);
+		blocksRequested[offsetIndex / blockReqSize] = -1;
+	}
+	
 	public void setObtainedBlock(int index) {
 		blocksRequested[index] = 1;
 	}
@@ -193,6 +197,10 @@ public class ChannelData {
 		}
 	}
 	
+	public boolean pieceComplete() {
+		return blocksCollected.position() == blocksCollected.limit();
+	}
+	
 	private byte[] getIntBytes(int num) {
 		byte[] pieceBytes = new byte[4];
 		int count = 0;
@@ -201,6 +209,19 @@ public class ChannelData {
 				i -= 8;
 		}
 		return pieceBytes;
+	}
+	
+	public void addReceivedBlocks(byte[] offset, byte[] blocks) {
+		int offsetIndex = ByteBuffer.wrap(offset).getInt();
+		blocksCollected.put(offsetIndex, blocks, 0, blocks.length);
+	}
+	
+	public byte[] getStoredTcpPacketBytes() {
+		return storedTcpPacketBytes;
+	}
+	
+	public void setStoredTcpPacketBytes(byte[] bytesToStore) {
+		storedTcpPacketBytes = bytesToStore;
 	}
 	
 	
@@ -214,8 +235,9 @@ public class ChannelData {
 	private boolean seedingApproved = true;
 	private int piece = -1;
 	private byte[][] blockRequests;
-	private ByteBuffer blocks = null;
 	private byte[] blocksRequested = null;
+	private ByteBuffer blocksCollected = null;
+	private byte[] storedTcpPacketBytes = null;
 	
 	private int numBlocksRequested = 0;
 	private Peer peer;

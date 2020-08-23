@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -102,11 +103,26 @@ public class NIOThread extends Thread {
 					SelectionKey key = (SelectionKey) iterator.next();
 					iterator.remove();
 					
-					if(key.isValid() && key.isAcceptable()) {//Acceptable Start
-						System.out.println("FLOW: isAcceptable()");
-					}//Acceptable End
 					
-					if(key.isValid() && key.isConnectable()) {//Connect Start
+					/*===============================================================================================================================================*\
+					 * 															Accept Start																		 *
+					\*===============================================================================================================================================*/
+					
+					if(key.isValid() && key.isAcceptable()) {
+						System.out.println("FLOW: isAcceptable()");
+					}
+					
+					/*===============================================================================================================================================*\
+					 * 															Accept End																			 *
+					\*===============================================================================================================================================*/
+					
+					
+					
+					/*===============================================================================================================================================*\
+					 * 															Connect Start																		 *
+					\*===============================================================================================================================================*/
+					
+					if(key.isValid() && key.isConnectable()) {
 						System.out.println("FLOW: isConnectable()");
 						
 						try {
@@ -132,37 +148,53 @@ public class NIOThread extends Thread {
 							System.exit(0);
 						}
 						
-					}//Connect End
+					}
 					
-					if(key.isValid() && key.isReadable()) {//Read Start
+					/*===============================================================================================================================================*\
+					 * 															Connect End																			 *
+					\*===============================================================================================================================================*/
+					
+					
+					
+					
+					/*===============================================================================================================================================*\
+					 * 															Read Start																			 *
+					\*===============================================================================================================================================*/
+					
+					if(key.isValid() && key.isReadable()) {
 						System.out.println("FLOW: isReadable()");
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
 						int channelNioKey = channelData.getNioKey();
 						
 						
-						if(channelData != null){
-							if(channelData.getStatus() == ChannelStatus.PROCESSING_MESSAGES) {
+						if(channelData.getStatus() == ChannelStatus.PROCESSING_MESSAGES) {
+							
+							ByteBuffer buff = ByteBuffer.allocate(10000);
+							channel.read(buff);
+							
+							
+							try {
+								Files.write(Paths.get("/home/mkg/Desktop/Message"), Arrays.copyOfRange(buff.array(), 0, buff.position()), StandardOpenOption.APPEND);
+								System.out.println(Arrays.copyOfRange(buff.array(), 0, buff.position()).length);
+							} catch (IOException e) {
+								// TODO Auto-generated catch block
+								e.printStackTrace();
+							}
+							
+							String result = this.receiveMessage(channelData, Arrays.copyOfRange(buff.array(), 0, buff.position()));
+							System.out.println(result);
+								//TODO End of code
 								
-								ByteBuffer buff = ByteBuffer.allocate(500000);
-								channel.read(buff);
-								Files.write(Paths.get("/home/mkg/Desktop/Received.txt"), Arrays.copyOfRange(buff.array(), 0, buff.position()));
-								
-								//this.hexPrint(Arrays.copyOfRange(buff.array(), 0, buff.position()));
-								
-								debugCount++;
-								if(debugCount > 10) {
-									//TODO End of code
+								if(channelData.pieceComplete()) {
 									System.out.println("Code end reached!");
 									System.exit(0);
 								}
-							}
-						}
-						if(debugCount < 1) {
-						
-						
-						
-						if(channelData.getStatus() == ChannelStatus.WAITING_TRACKER_RESPONSE) {
+								
+								
+								
+								
+						} else if(channelData.getStatus() == ChannelStatus.WAITING_TRACKER_RESPONSE) {
 							channel = (SocketChannel)key.channel();
 							ByteBuffer buff = ByteBuffer.allocate(4000);//Should be sufficient for average dictionary mode if required, can refine later on in project
 							channel.read(buff);
@@ -193,11 +225,21 @@ public class NIOThread extends Thread {
 						 }
 							
 							
-						}	
+							
 						
-					}//Read end
+					}
 					
-					if(key.isValid() && key.isWritable()) {//Write Start
+					/*===============================================================================================================================================*\
+					 * 															Read End																			 *
+					\*===============================================================================================================================================*/
+					
+					
+					
+					/*===============================================================================================================================================*\
+					 * 															Write Start																			 *
+					\*===============================================================================================================================================*/
+					
+					if(key.isValid() && key.isWritable()) {
 						System.out.println("FLOW: isWritable()");
 						
 						SocketChannel channel = (SocketChannel)key.channel();
@@ -216,25 +258,17 @@ public class NIOThread extends Thread {
 							newKey.attach(channelData);
 						} else if(channelData.getStatus() == ChannelStatus.PROCESSING_MESSAGES) {
 							int processedDataKey = this.processData(channelData);
-							
-							/*
-							 * 
-							 * 
-							 * 
-							 * 
-							 * 
-							 */
-							//ByteBuffer buff = ByteBuffer.wrap(channelData.getOutboundMessage());
 							this.writeMessage(channel, channelData.getOutboundMessages());
-							
-							
-							
-							
 							SelectionKey newKey = channel.register(selector, processedDataKey);
 							newKey.attach(channelData);
 						}
 						
-					}//Write end
+					}
+					
+					/*===============================================================================================================================================*\
+					 * 															Write End																			 *
+					\*===============================================================================================================================================*/
+					
 					
 				}
 			}
@@ -245,6 +279,9 @@ public class NIOThread extends Thread {
 	}
 	
 	
+	/*===============================================================================================================================================*\
+	 * 															METHODS																				 *
+	\*===============================================================================================================================================*/
 	
 	
 	/*==================================*\	
@@ -328,21 +365,21 @@ public class NIOThread extends Thread {
 	
 	//String will need to contain a relevant error message if a fault is detected
 	private String receiveMessage(ChannelData channelData, byte[] msgData) {
+		
 		String result = "OK";
 		Integer channelNioKey = channelData.getNioKey();
-		LinkedHashMap<Byte, byte[]> messages = this.extractMessages(msgData);
+		ArrayDeque<byte[]> messages = this.extractMessages(channelData, msgData);
 		
-		for(byte msgID : messages.keySet()) {
-			
-			switch (msgID) {
+		for(byte[] msg : messages) {
+			switch (msg[0]) {
 				case (byte)19: {
-					channelData.getPeer().setHandShake(messages.get(msgID));
+					channelData.getPeer().setHandShake(Arrays.copyOfRange(msg, 1, msg.length));
 					channelData.setStatus(ChannelStatus.SENDING_BITFIELD);
 					break;
 				}
 				
 				case (byte)5:{
-					channelData.getPeer().setBitfield(messages.get(msgID));
+					channelData.getPeer().setBitfield(Arrays.copyOfRange(msg, 1, msg.length));
 					PiecePicker picker = PiecePickers.get(channelNioKey);
 					picker.processBitField(channelData.getPeer().getBitfield());
 					
@@ -353,7 +390,7 @@ public class NIOThread extends Thread {
 							channelData.getPeer().setBitfieldSent();
 						}
 					}
-						
+					
 					channelData.setStatus(ChannelStatus.CHECKING_FOR_PIECE);
 					break;
 				}
@@ -363,14 +400,88 @@ public class NIOThread extends Thread {
 					break;
 				}
 				
+				case(byte)7:{
+					byte[] pieceIndex = Arrays.copyOfRange(msg, 1, 5);
+					byte[] offset = Arrays.copyOfRange(msg, 5, 9);
+					byte[] payload = Arrays.copyOfRange(msg, 9, msg.length);
+					
+					channelData.addReceivedBlocks(offset, payload);
+					channelData.setBlockObtained(offset, (int) torrentsProcessing.get(channelNioKey).getPieceSize(), blockReqSize);
+					
+					break;
+				}
+				
+				
 				default:
-					result = "Unrecognised Message: " + (byte)msgID;
+					result = "Unrecognised Message: " + (byte)msg[0];
 				}
 			
 			
 		}
 		return result;
 	}
+	
+		
+	private ArrayDeque<byte[]> extractMessages(ChannelData channelData, byte[] message){
+		ArrayDeque<byte[]> parsedMessages = new ArrayDeque<byte[]>();
+		
+		byte[] storedTcpPacketBytes = channelData.getStoredTcpPacketBytes();
+		byte[] allMsgBytes = message;
+		
+		if(storedTcpPacketBytes != null) {//Combine bytes from previous message if they are there
+			allMsgBytes = new byte[message.length + storedTcpPacketBytes.length];
+			System.arraycopy(storedTcpPacketBytes, 0, allMsgBytes, 0, storedTcpPacketBytes.length);
+			System.arraycopy(message, 0, allMsgBytes, storedTcpPacketBytes.length, message.length);
+		} 
+		
+		int index = 0;
+		while(index < allMsgBytes.length) {
+			storedTcpPacketBytes = null;
+			if((allMsgBytes.length - index) >= 5) {//Minimum needed for message length & ID
+				byte[] handshakePrefix = new byte[] {(byte)0x13, (byte)0x42, (byte)0x69, (byte)0x74, (byte)0x54};
+				if(index < 5 && Arrays.compare(Arrays.copyOfRange(allMsgBytes, index, 5), handshakePrefix) == 0) {//Msg starts with handshake
+					if(allMsgBytes.length >= 68) {//Rest of handshake is present
+						byte[] handshake = new byte[68];
+						System.arraycopy(Arrays.copyOfRange(allMsgBytes, 0, 68), 0, handshake, 0, 68);
+						parsedMessages.add(handshake);
+						index = 68;
+						continue;
+					} else {
+						storedTcpPacketBytes = allMsgBytes;
+						channelData.setStoredTcpPacketBytes(storedTcpPacketBytes);
+						index = allMsgBytes.length;
+						break;
+						
+					}
+				} 
+				
+				
+				int msgLength = ByteBuffer.wrap(Arrays.copyOfRange(allMsgBytes, index, index + 4)).getInt();
+				byte msgID = allMsgBytes[index + 4];
+				index += 4;
+				if((allMsgBytes.length - index) >= msgLength ) {//Amount remaining is enough for whole message
+					byte[] newMessage = new byte[msgLength];
+					
+					System.arraycopy(Arrays.copyOfRange(allMsgBytes, index, index + msgLength), 0, newMessage, 0, msgLength);
+					parsedMessages.add(newMessage);
+					index += msgLength;
+				} else {
+					storedTcpPacketBytes = Arrays.copyOfRange(allMsgBytes, index - 4, allMsgBytes.length);
+					channelData.setStoredTcpPacketBytes(storedTcpPacketBytes);
+					break;
+				}
+				
+			} else {
+				storedTcpPacketBytes = Arrays.copyOfRange(allMsgBytes, index, allMsgBytes.length);
+				channelData.setStoredTcpPacketBytes(storedTcpPacketBytes);
+				break;
+			}
+		}
+		
+		
+		return parsedMessages;
+	}
+	
 	
 	private void writeMessage(SocketChannel channel, byte[] message) throws IOException {
 		channel.write(ByteBuffer.wrap(message));
@@ -379,42 +490,10 @@ public class NIOThread extends Thread {
 	//DEBUG 
 	private void hexPrint(byte[] bytes) {
 		for(byte b : bytes) {
-			//System.out.print(String.format("%-2s", Integer.toHexString(((byte)b) & 0xFF).toUpperCase()) + " ");
 			System.out.print(String.format("%02X", ((byte)b) & 0xFF).toUpperCase() + " ");
 		}
 		System.out.println();
 	}
-	
-	
-	private ArrayDeque<byte[]> extractMessages(byte[] message){
-		ArrayDeque<byte[]> messages = new ArrayDeque<byte[]>();
-		
-		int index = 0;
-		int count = 0;
-		while(index < message.length) {
-		
-			if(message.length >= 68 && index == 0) {
-				String messageStart = message[0] + new String(Arrays.copyOfRange(message, 1, 20), StandardCharsets.ISO_8859_1);
-				if(messageStart.equals("19BitTorrent protocol")) {
-					byte[] handshake = new byte[69];
-					handshake[0] = 19;
-					System.arraycopy(Arrays.copyOfRange(message, 0, 68), 0, handshake, 1, 68);
-		//			messages.put((byte) 19, Arrays.copyOfRange(message, 0, 68));
-					index = 68;
-				} 
-			}
-			
-			ByteBuffer buff = ByteBuffer.wrap(Arrays.copyOfRange(message, index, index + 4));
-			int messageLength = buff.getInt();
-			index += 4;
-			
-		//	messages.put(message[index], Arrays.copyOfRange(message, index + 1, (index + messageLength)));
-			index += messageLength;
-		}
-		return messages;
-	}
-	
-	
 	private byte[] getHandshake(TorrentFile tf) {
 		ByteBuffer buff = ByteBuffer.allocate(68);
 		buff.put((byte) 19); //pstrlen
@@ -555,7 +634,7 @@ public class NIOThread extends Thread {
 	private static NIOThread nioThread = null;
 	private StringBuilder peerID = new StringBuilder("TM470");
 	private int myListeningPort = 6888;
-	private int blockReqSize = 16000;
+	private int blockReqSize = 4000;
 	
 	protected volatile HashSet<TorrentFile> torrentsToProcess = new HashSet<TorrentFile>();
 	
@@ -566,6 +645,9 @@ public class NIOThread extends Thread {
 	public volatile boolean nioShutdown = false;
 	public int blocksWaiting = 10;
 	
-	private int debugCount = 0;
+	//DEBUG
+	private static int msgCount = 0;
+	
+
 	
 }
