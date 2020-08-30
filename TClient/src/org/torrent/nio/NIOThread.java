@@ -5,6 +5,8 @@ import java.net.InetSocketAddress;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
@@ -15,7 +17,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -30,6 +34,7 @@ import java.util.stream.IntStream;
 import org.torrent.bencoding.BencodeParser;
 import org.torrent.bencoding.TorrentFile;
 import org.torrent.bencoding.TorrentFile.PieceSelectionPolicy;
+import org.torrent.coredata.BitfieldOperations;
 import org.torrent.coredata.ChannelData;
 import org.torrent.coredata.FlowControls;
 import org.torrent.coredata.FlowControls.ChannelStatus;
@@ -87,6 +92,7 @@ public class NIOThread extends Thread {
 										System.out.println("Registered with selector!");
 										ChannelData channelData = new ChannelData(storesKey, peer, ChannelStatus.CONTACTING_PEER);
 										tf.addNewDownloadingConn(channel);
+										tf.addChannelData(channelData);
 										newKey.attach(channelData);
 									}
 								}
@@ -109,7 +115,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isAcceptable()) {
-						System.out.println("FLOW: isAcceptable()");
+					//	System.out.println("FLOW: isAcceptable()");
 					}
 					
 					/*===============================================================================================================================================*\
@@ -123,7 +129,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isConnectable()) {
-						System.out.println("FLOW: isConnectable()");
+					//	System.out.println("FLOW: isConnectable()");
 						
 						try {
 							SocketChannel channel = (SocketChannel)key.channel();
@@ -162,7 +168,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isReadable()) {
-						System.out.println("FLOW: isReadable()");
+					//	System.out.println("FLOW: isReadable()");
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
 						int channelNioKey = channelData.getNioKey();
@@ -173,30 +179,24 @@ public class NIOThread extends Thread {
 							ByteBuffer buff = ByteBuffer.allocate(10000);
 							channel.read(buff);
 							
-							
-							try {
-								Files.write(Paths.get("/home/mkg/Desktop/Message"), Arrays.copyOfRange(buff.array(), 0, buff.position()), StandardOpenOption.APPEND);
-								System.out.println(Arrays.copyOfRange(buff.array(), 0, buff.position()).length);
-							} catch (IOException e) {
-								// TODO Auto-generated catch block
-								e.printStackTrace();
-							}
-							
 							String result = this.receiveMessage(channelData, Arrays.copyOfRange(buff.array(), 0, buff.position()));
-							System.out.println(result);
-								//TODO End of code
-								
-								if(channelData.pieceComplete()) {
-									System.out.println("Code end reached!");
-									System.exit(0);
+							
+							if(result.equals("OK")) {
+								int processedDataKey = this.processData(channelData);
+								if(processedDataKey == -2) {
+									break;
 								}
 								
-								
-								
+								SelectionKey newKey = channel.register(selector, processedDataKey);
+								newKey.attach(channelData);
+							} else {
+								System.out.println("Error reading message!");
+								System.exit(0);
+							}
 								
 						} else if(channelData.getStatus() == ChannelStatus.WAITING_TRACKER_RESPONSE) {
 							channel = (SocketChannel)key.channel();
-							ByteBuffer buff = ByteBuffer.allocate(4000);//Should be sufficient for average dictionary mode if required, can refine later on in project
+							ByteBuffer buff = ByteBuffer.allocate(4000);//Should be sufficient for average dictionary mode if required
 							channel.read(buff);
 							
 							this.parseTrackerResponse(buff.array(), channelNioKey);
@@ -205,7 +205,7 @@ public class NIOThread extends Thread {
 							torrentsProcessing.get(channelNioKey).setStatus(TorrentStatus.MESSAGING_PEERS);
 							
 						} else {
-							ByteBuffer buff = ByteBuffer.allocate(500000);
+							ByteBuffer buff = ByteBuffer.allocate(17000);
 							channel.read(buff);
 							
 							String result = this.receiveMessage(channelData, Arrays.copyOfRange(buff.array(), 0, buff.position()));
@@ -223,10 +223,6 @@ public class NIOThread extends Thread {
 								System.exit(0);
 							}
 						 }
-							
-							
-							
-						
 					}
 					
 					/*===============================================================================================================================================*\
@@ -240,7 +236,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isWritable()) {
-						System.out.println("FLOW: isWritable()");
+					//	System.out.println("FLOW: isWritable()");
 						
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
@@ -327,18 +323,27 @@ public class NIOThread extends Thread {
 					if(!channelData.pieceSet()) {
 						if(picker.pieceAvailable(peer.getBitfield())) {
 							channelData.setPiece(picker.getPiece(peer.getBitfield()));
+							System.out.println("Setting Piece: " + channelData.getPiece());
 							
 						} else {
-							//TODO No piece Available
+							if(torrentsProcessing.get(channelNioKey).fileComplete()) {
+								return -2;
+							} else {
+								System.out.println("Error, no piece available");
+								System.exit(0);
+							}
 						}
 					} 
 					
 					if(!picker.endGameEnabled()) {
 						if(!channelData.blocksRequested()) {
 							byte[][] requests = channelData.getBlockRequests((int)torrentsProcessing.get(channelNioKey).getPieceSize(), channelData.getPiece(), blockReqSize);
+							byte[] blockTracker = channelData.getBlocksRequested();
 							for(int i = 0; i < requests.length; i++) {
-								channelData.addMessage(requests[i]);
-								channelData.setBlockRequested(i);
+								if(blockTracker[i] != -1) {
+									channelData.addMessage(requests[i]);
+									channelData.setBlockRequested(i);
+								}
 							}
 							return SelectionKey.OP_WRITE;									
 						} else {
@@ -355,13 +360,27 @@ public class NIOThread extends Thread {
 				
 				break;
 			}
-			
 		}
-		
 		return -1;
 	}
 	
 	
+	
+	/*==================================*\	
+	 *	  ID to message mapping   		*
+	 *==================================*
+	 * 		  Handshake: 19				*
+	 * 		 Keep-Alive: ? 				*
+	 * 	          Choke: 0				*
+	 *   		Unchoke: 1				*
+	 *  	 Interested: 2				*
+	 *   Not-Interested: 3				*
+	 *			   Have: 4				*
+	 *		   Bitfield: 5  			*
+	 *  		Request: 6				*
+	 *  		  Piece: 7				*
+	 *			 Cancel: 8  			*
+	\*==================================*/
 	
 	//String will need to contain a relevant error message if a fault is detected
 	private String receiveMessage(ChannelData channelData, byte[] msgData) {
@@ -401,16 +420,56 @@ public class NIOThread extends Thread {
 				}
 				
 				case(byte)7:{
-					byte[] pieceIndex = Arrays.copyOfRange(msg, 1, 5);
-					byte[] offset = Arrays.copyOfRange(msg, 5, 9);
+					
+					byte[] pieceIndexBytes = Arrays.copyOfRange(msg, 1, 5);
+					int pieceIndex = ByteBuffer.wrap(pieceIndexBytes).getInt();
+					byte[] offsetBytes = Arrays.copyOfRange(msg, 5, 9);
 					byte[] payload = Arrays.copyOfRange(msg, 9, msg.length);
+					int piece = channelData.getPiece();
 					
-					channelData.addReceivedBlocks(offset, payload);
-					channelData.setBlockObtained(offset, (int) torrentsProcessing.get(channelNioKey).getPieceSize(), blockReqSize);
-					
+					if(pieceIndex == piece) {
+						TorrentFile torrentFile = torrentsProcessing.get(channelNioKey);
+						channelData.addReceivedBlock(offsetBytes, payload);
+						channelData.setBlockObtained(offsetBytes, (int) torrentFile.getPieceSize(), blockReqSize);
+						torrentFile.updateDownloadedBytesCount(payload.length);
+						
+						if(channelData.pieceComplete()) {
+							if(torrentFile.validatePiece(channelData.getBlocksCollected().array(), piece) == 0) {
+								try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(torrentFile.getOutputFileLocation(), EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))){
+									byte[] pieceBlocks = channelData.getBlocksCollected().array();
+									System.out.println("Piece Length: " + pieceBlocks.length + " Offset: " + pieceBlocks.length * piece);
+									MappedByteBuffer mapBuff = fileChannel.map(FileChannel.MapMode.READ_WRITE, pieceBlocks.length * piece, pieceBlocks.length);
+									mapBuff.put(pieceBlocks);
+									 
+								} catch (IOException io){
+									//TODO File Write Error
+									System.err.println("Error writing to file.");
+									io.printStackTrace();
+									System.exit(0);
+								}
+								
+								PiecePickers.get(channelNioKey).pieceObtained(pieceIndex);
+								channelData.setPiece(-1);
+								channelData.clearBlockData();
+								
+								HashSet<ChannelData> allChannelData = torrentFile.getallChannelData();
+								for(ChannelData cData : allChannelData) {
+									byte[] bitfield = cData.getPeer().getBitfield();
+									if(!BitfieldOperations.checkBit(pieceIndex, bitfield)) {
+										byte[] haveMsg = new byte[] {0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, pieceIndexBytes[0], pieceIndexBytes[1], pieceIndexBytes[2], pieceIndexBytes[3]};
+										cData.addMessage(msgData);
+									}
+								}
+								
+								if(torrentFile.fileComplete()) {
+									System.out.println("File Complete!");
+									nioShutdown = true;
+								}
+							} 
+						}
+					}
 					break;
 				}
-				
 				
 				default:
 					result = "Unrecognised Message: " + (byte)msg[0];
@@ -477,8 +536,6 @@ public class NIOThread extends Thread {
 				break;
 			}
 		}
-		
-		
 		return parsedMessages;
 	}
 	
@@ -630,11 +687,11 @@ public class NIOThread extends Thread {
 	private HashMap<Integer, TorrentFile> torrentsProcessing = new HashMap<Integer, TorrentFile>();
 	private HashMap<Integer, PeerManager> peerManagers = new HashMap<Integer, PeerManager>();
 	private HashMap<Integer, PiecePicker> PiecePickers  = new HashMap<Integer, PiecePicker>();
-	private Integer nioKey = 0;
+	private Integer nioKey = -1;
 	private static NIOThread nioThread = null;
 	private StringBuilder peerID = new StringBuilder("TM470");
 	private int myListeningPort = 6888;
-	private int blockReqSize = 4000;
+	private int blockReqSize = 16000;
 	
 	protected volatile HashSet<TorrentFile> torrentsToProcess = new HashSet<TorrentFile>();
 	

@@ -14,6 +14,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.torrent.coredata.ChannelData;
 import org.torrent.coredata.FlowControls.TorrentStatus;
 
 @SuppressWarnings("unused")
@@ -29,16 +30,15 @@ public class TorrentFile {
 	public TorrentFile(Path torrentFile, Path targetLocation, PieceSelectionPolicy pieceSelectionPolicy) throws IOException {
 		bencodedFile = torrentFile;
 		parsedFile = BencodeParser.parseBencoding(torrentFile);
-		newFileLocation = targetLocation;
+		outputFileLocation = targetLocation;
 		piecePolicy = pieceSelectionPolicy;
 		tracker = new URL((String) parsedFile.get("announce"));
 		bitfield = new byte[this.getNumPieces() / 8];
 		Arrays.fill(bitfield, (byte)0);
 		
 		
-		
 		HashMap<String, Object> infoDict = (HashMap<String, Object>) parsedFile.get("info");
-		newFileLocation = Paths.get(String.format("%s%s%s%s%s", System.getProperty("user.home"), File.separator, "Downloads", File.separator, (String) infoDict.get("name")));
+		//newFileLocation = Paths.get(String.format("%s%s%s%s%s", System.getProperty("user.home"), File.separator, "Downloads", File.separator, (String) infoDict.get("name")));
 		fileSize = (long) infoDict.get("length");
 	}
 	
@@ -46,8 +46,17 @@ public class TorrentFile {
 		return amountDownloaded;
 	}
 	
+	public void updateDownloadedBytesCount(int num) {
+		amountDownloaded += num;
+	}
+	
 	public long getfileSize() {
 		return fileSize;
+	}
+	
+	public boolean fileComplete() {
+		System.out.println("Amount Downloaded: " + amountDownloaded + "  File Size: " + fileSize);
+		return amountDownloaded == fileSize;
 	}
 	
 	public long getFinalPieceSize() {
@@ -83,6 +92,30 @@ public class TorrentFile {
 			System.exit(0);
 		}
 		return hash;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public int validatePiece(byte[] pieceBytes, int piece) {
+		HashMap<String, Object> infoDict = (HashMap<String, Object>) parsedFile.get("info");
+		byte[] pieceHashes = (byte[]) infoDict.get("pieces");
+		byte[] pieceHash = Arrays.copyOfRange(pieceHashes, piece * 20, (piece * 20) + 20);
+		
+			
+		MessageDigest md;
+		byte[] newPieceHash = new byte[20];
+		try {
+		
+			md = MessageDigest.getInstance("SHA-1");
+			newPieceHash = md.digest(pieceBytes);
+			
+			
+		} catch (NoSuchAlgorithmException e) {
+			System.err.println("Algorithm exception occured trying to hash info dictionary:");
+			e.printStackTrace();
+			System.exit(0);
+		}
+		
+		return Arrays.compare(newPieceHash, pieceHash);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -153,10 +186,32 @@ public class TorrentFile {
 		numDownloadingConns--;
 	}
 	
+	public HashSet<SocketChannel> getCurrentConns() {
+		return currentConns;
+	}
+	
+	public void addChannelData(ChannelData channelData) {
+		channelDataStore.add(channelData);
+	}
+	
+	public void removeChannelData(ChannelData channelData) {
+		channelDataStore.remove(channelData);
+	}
+	
+	public HashSet<ChannelData> getallChannelData() {
+		return channelDataStore;
+	}
+	
+	
+	public Path getOutputFileLocation() {
+		return outputFileLocation;
+	}
+	
 	
 	private HashMap<String, Object> parsedFile;
 	private long trackerRefreshTime;
 	private HashSet<SocketChannel> currentConns = new HashSet<SocketChannel>();
+	private HashSet<ChannelData> channelDataStore = new HashSet<ChannelData>();
 	private URL tracker;
 	
 	
@@ -166,7 +221,7 @@ public class TorrentFile {
 	private long fileSize;
 	private byte[] bitfield;
 	private TorrentStatus torrentStatus;
-	private Path newFileLocation;
+	private Path outputFileLocation;
 	private PieceSelectionPolicy piecePolicy;
 	private Path bencodedFile;
 

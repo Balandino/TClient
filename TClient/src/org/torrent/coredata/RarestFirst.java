@@ -8,10 +8,10 @@ public class RarestFirst extends PiecePicker {
 	
 	public RarestFirst(int numPieces, long finalPieceSize) {
 		this.finalPieceSize = finalPieceSize;
-		pieces = new int[numPieces][numPieces];
+		pieces = new int[numPieces][2];
 		totalNumPieces = numPieces;
 		for (int i = 0; i < pieces.length; i++) {
-			pieces[i][0] = i + 1;
+			pieces[i][0] = i;
 		}
 	}
 
@@ -19,10 +19,12 @@ public class RarestFirst extends PiecePicker {
 	public int getPiece(byte[] bitfield) {
 		int chosenPiece = 0;
 		for(int i = 0; i < pieces.length; i++) {
-			if(this.checkBit(pieces[i][0], bitfield)) {
+			if(BitfieldOperations.checkBit(pieces[i][0], bitfield)) {
 				chosenPiece = pieces[i][0];
-				piecesInProgress.add(pieces[i][0]);
-				break;
+				if(chosenPiece != -1 && !piecesInProgress.contains(chosenPiece)) {
+					piecesInProgress.add(pieces[i][0]);
+					break;
+				}
 			}
 		}
 		return chosenPiece;
@@ -32,35 +34,21 @@ public class RarestFirst extends PiecePicker {
 	public void processBitField(byte[] bitfield) {
 		for(int i = 0; i < pieces.length; i++) {
 			int pieceNum = pieces[i][0];
-			if(this.checkBit(pieceNum, bitfield)) {
+			if(BitfieldOperations.checkBit(pieceNum, bitfield)) {
 				pieces[i][1]++;
 			}
 		}
 		Arrays.parallelSort(pieces, (b, a) -> Integer.compare(a[1], b[1]));
 	}
 
-	private boolean checkBit(int piece, byte[] bitfield) {
-		int bitToCheck = piece - 1;
-		int byteToCheck = bitToCheck / 8;
-		int offset = bitToCheck % 8;
-		
-		return ((bitfield[byteToCheck] & 1 << (7 - offset)) != 0) ? true : false; 
-	}
 	
-	private void setBit(int piece, byte[] bitfield, boolean setOn) {
-		int bitToCheck = piece - 1, curByte = bitToCheck / 8, offset = bitToCheck % 8;
-		if(setOn) {
-			bitfield[curByte] |= 1 << (7 - offset);	
-		} else {
-			bitfield[curByte] &= ~(1 << (7 - offset));
-		} 
-	}
 	
 	@Override
 	public boolean pieceAvailable(byte[] bitfield) {
 		for(int i = 0; i < pieces.length; i++) {
-			if(this.checkBit(pieces[i][0], bitfield)) {
-				if(!piecesInProgress.contains(pieces[i][0])) {
+			if(BitfieldOperations.checkBit(pieces[i][0], bitfield)) {
+				int chosenPiece = pieces[i][0];
+				if(chosenPiece != -1 && !piecesInProgress.contains(chosenPiece)) {
 					return true;
 				}
 			}
@@ -102,19 +90,41 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public void pieceObtained(int piece) {
-		// TODO Auto-generated method stub
+		int count = 0;
+		while(count < pieces.length) {
+			if(pieces[count][0] == piece) {
+				pieces[count][0] = -1;
+				break;
+			}
+			count++;
+		}
+		piecesObtainedCount++;
+		piecesInProgress.remove(piece);
 		
+		if(piecesObtainedCount != pieces.length) {
+			double percentageComplete = (piecesObtainedCount / pieces.length) * 100;
+			if(percentageComplete > 10) {
+				this.removeObtainedPieces();
+			}
+		}
 	}
 
 	@Override
 	public void pieceUnobtained(int piece) {
 		// TODO Auto-generated method stub
-		
 	}
 	
-		
-	private void removeObtainedPieces(int[] pieces) {
-		
+	private void removeObtainedPieces() {
+		int[][] newPiecesArray = new int[piecesObtainedCount][2];
+		int count = 0;
+		for(int i = 0; i < pieces.length; i++) {
+			if(pieces[i][0] != -1) {
+						newPiecesArray[count][0] = pieces[i][0];
+						newPiecesArray[count][1] = pieces[i][1];
+						count++;
+				}
+			Arrays.parallelSort(newPiecesArray, (b, a) -> Integer.compare(a[1], b[1]));
+			}
 	}
 	
 	//FOR DEBUGGING PURPOSES

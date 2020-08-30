@@ -116,10 +116,10 @@ public class ChannelData {
 	
 	public byte[] getOutboundMessages() {
 		byte[] messages = new byte[outBoundQueueLength];
-		Iterator<byte[]> iterator = outboundQueue.iterator();
+		
 		int count = 0;
-		while(iterator.hasNext()) {
-			byte[] nextMsg = iterator.next();
+		while(outboundQueue.size() > 0) {
+			byte[] nextMsg = outboundQueue.pop();
 			System.arraycopy(nextMsg, 0, messages, count, nextMsg.length);
 			count += nextMsg.length; 
 		}
@@ -179,14 +179,14 @@ public class ChannelData {
 		blocksRequested[index] = 1;
 	}
 	
+	public byte[] getBlocksRequested() {
+		return blocksRequested;
+	}
+	
 	public void setBlockObtained(byte[] offset, int pieceSize, int blockReqSize) {
 		int offsetIndex = ByteBuffer.wrap(offset).getInt();
 		blockReqSize = Math.min(blockReqSize, pieceSize);
 		blocksRequested[offsetIndex / blockReqSize] = -1;
-	}
-	
-	public void setObtainedBlock(int index) {
-		blocksRequested[index] = 1;
 	}
 	
 	public void clearRequestedBlocks() {
@@ -195,6 +195,7 @@ public class ChannelData {
 				b = 0;
 			}
 		}
+		
 	}
 	
 	public boolean pieceComplete() {
@@ -211,9 +212,10 @@ public class ChannelData {
 		return pieceBytes;
 	}
 	
-	public void addReceivedBlocks(byte[] offset, byte[] blocks) {
+	public void addReceivedBlock(byte[] offset, byte[] block) {
 		int offsetIndex = ByteBuffer.wrap(offset).getInt();
-		blocksCollected.put(offsetIndex, blocks, 0, blocks.length);
+		blocksCollected.put(offsetIndex, block, 0, block.length);
+		blocksCollected.position(blocksCollected.position() + block.length);
 	}
 	
 	public byte[] getStoredTcpPacketBytes() {
@@ -222,6 +224,17 @@ public class ChannelData {
 	
 	public void setStoredTcpPacketBytes(byte[] bytesToStore) {
 		storedTcpPacketBytes = bytesToStore;
+	}
+	
+	public void clearBlockData() {
+		blocksRequested = null;
+		blocksCollected = null;
+		storedTcpPacketBytes = null;
+	}
+	
+	//DEBUG
+	public ByteBuffer getBlocksCollected() {
+		return blocksCollected;
 	}
 	
 	
