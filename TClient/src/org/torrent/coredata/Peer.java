@@ -6,7 +6,7 @@ import java.util.Arrays;
 public class Peer {
 	
 	//SHOULD BE Protected, CHANGE BACK WHEN TESTING IS COMPLETE
-	public Peer(String ipAddress, int portNum) {
+	protected Peer(String ipAddress, int portNum) {
 		ip = ipAddress;
 		port = portNum;
 	}
@@ -58,6 +58,10 @@ public class Peer {
 	
 	public void setBitfieldSent() {
 		bitFieldSent = true;
+	}
+	
+	public void processHave(int piece) {
+		BitfieldOperations.setBit(piece, bitfield, true);
 	}
 	
 	@Override

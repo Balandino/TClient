@@ -1,6 +1,7 @@
 package org.torrent.coredata;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
@@ -9,10 +10,11 @@ import org.torrent.coredata.FlowControls.ChannelStatus;
 @SuppressWarnings("unused")
 public class ChannelData {
 	
-	public ChannelData(Integer nioKey, Peer peer, ChannelStatus status) {
+	public ChannelData(Integer nioKey, Peer newPeer, ChannelStatus status, SocketChannel socketChannel) {
 		nioStoresKey = nioKey;
 		channelStatus = status;
-		this.peer = peer;
+		peer = newPeer;
+		channel = socketChannel;
 	}
 	
 	public ChannelData(Integer nioKey, ChannelStatus status) {
@@ -131,7 +133,7 @@ public class ChannelData {
 		return outboundQueue.pop();
 	}
 	
-	public boolean messageReady() {
+	public boolean hasMessages() {
 		return outboundQueue.size() > 0;
 	}
 	
@@ -232,16 +234,30 @@ public class ChannelData {
 		storedTcpPacketBytes = null;
 	}
 	
-	//DEBUG
 	public ByteBuffer getBlocksCollected() {
 		return blocksCollected;
 	}
 	
+	public void setTimeout(int time) {
+		lastActionTime = System.nanoTime();
+		timeout = time;
+	}
+	
+	public boolean checkForTimeout() {
+		return (((System.nanoTime() - lastActionTime) / 1000000000) > timeout) ? true : false;
+	}
+	
+	public SocketChannel getChannel() {
+		return channel;
+	}
+
+	
 	
 	private ArrayDeque<byte[]> outboundQueue = new ArrayDeque<byte[]>();
 	private int outBoundQueueLength = 0;
-	private long lastMsgReceived;
 	private long interestTimeout;
+	private long lastActionTime;
+	private int timeout;
 	private ChannelStatus channelStatus;
 	private Boolean[] connectionStatus = new Boolean[]{false, false, false, false};
 	private Integer nioStoresKey;
@@ -251,7 +267,7 @@ public class ChannelData {
 	private byte[] blocksRequested = null;
 	private ByteBuffer blocksCollected = null;
 	private byte[] storedTcpPacketBytes = null;
-	
+	private SocketChannel channel;
 	private int numBlocksRequested = 0;
 	private Peer peer;
 	
