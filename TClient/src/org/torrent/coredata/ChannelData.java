@@ -1,6 +1,7 @@
 package org.torrent.coredata;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
 import java.util.Iterator;
@@ -15,11 +16,16 @@ public class ChannelData {
 		channelStatus = status;
 		peer = newPeer;
 		channel = socketChannel;
+		channelNum = channelNumCount++;
 	}
 	
 	public ChannelData(Integer nioKey, ChannelStatus status) {
 		nioStoresKey = nioKey;
 		channelStatus = status;
+	}
+	
+	public int getChannelNum() {
+		return channelNum;
 	}
 	
 	public void setStatus(ChannelStatus status) {
@@ -220,6 +226,10 @@ public class ChannelData {
 		blocksCollected.position(blocksCollected.position() + block.length);
 	}
 	
+	public int getRemainingBlockSpace() {
+		return blocksCollected.position();
+	}
+	
 	public byte[] getStoredTcpPacketBytes() {
 		return storedTcpPacketBytes;
 	}
@@ -250,6 +260,14 @@ public class ChannelData {
 	public SocketChannel getChannel() {
 		return channel;
 	}
+	
+	public SelectionKey getCurrentKey() {
+		return currentKey;
+	}
+
+	public void setCurrentKey(SelectionKey key) {
+		currentKey = key;
+	}
 
 	
 	
@@ -259,7 +277,7 @@ public class ChannelData {
 	private long lastActionTime;
 	private int timeout;
 	private ChannelStatus channelStatus;
-	private Boolean[] connectionStatus = new Boolean[]{false, false, false, false};
+	private Boolean[] connectionStatus = new Boolean[]{false, true, false, true};
 	private Integer nioStoresKey;
 	private boolean seedingApproved = true;
 	private int piece = -1;
@@ -270,5 +288,8 @@ public class ChannelData {
 	private SocketChannel channel;
 	private int numBlocksRequested = 0;
 	private Peer peer;
+	private SelectionKey currentKey = null;
+	private int channelNum;
+	private static int channelNumCount = 0;
 	
 }

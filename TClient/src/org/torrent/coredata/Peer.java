@@ -61,7 +61,7 @@ public class Peer {
 	}
 	
 	public void processHave(int piece) {
-		BitfieldOperations.setBit(piece, bitfield, true);
+			BitfieldOperations.setBit(piece, bitfield, true);
 	}
 	
 	@Override

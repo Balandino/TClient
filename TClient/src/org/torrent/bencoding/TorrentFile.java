@@ -48,6 +48,7 @@ public class TorrentFile {
 	
 	public void updateDownloadedBytesCount(int num) {
 		amountDownloaded += num;
+		System.out.println("Amount Downloaded: " + amountDownloaded + "  File Size: " + fileSize);
 	}
 	
 	public long getfileSize() {
@@ -55,7 +56,6 @@ public class TorrentFile {
 	}
 	
 	public boolean fileComplete() {
-		System.out.println("Amount Downloaded: " + amountDownloaded + "  File Size: " + fileSize);
 		return amountDownloaded == fileSize;
 	}
 	

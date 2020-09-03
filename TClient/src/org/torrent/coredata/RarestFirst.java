@@ -3,11 +3,10 @@ package org.torrent.coredata;
 import java.util.Arrays;
 import java.util.HashSet;
 
-@SuppressWarnings("unused")
+
 public class RarestFirst extends PiecePicker {
 	
-	public RarestFirst(int numPieces, long finalPieceSize) {
-		this.finalPieceSize = finalPieceSize;
+	public RarestFirst(int numPieces) {
 		pieces = new int[numPieces][2];
 		totalNumPieces = numPieces;
 		for (int i = 0; i < pieces.length; i++) {
@@ -45,6 +44,13 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public boolean pieceAvailable(byte[] bitfield) {
+		
+		String inProgress = "";
+		for(Integer piece : piecesInProgress) {
+			inProgress+= piece + " ";
+		}
+		System.out.println("Pieces In Progress: " + inProgress);
+		
 		for(int i = 0; i < pieces.length; i++) {
 			if(BitfieldOperations.checkBit(pieces[i][0], bitfield)) {
 				int chosenPiece = pieces[i][0];
@@ -101,17 +107,17 @@ public class RarestFirst extends PiecePicker {
 		piecesObtainedCount++;
 		piecesInProgress.remove(piece);
 		
-		if(piecesObtainedCount != pieces.length) {
+		if(piecesObtainedCount != totalNumPieces) {
 			double percentageComplete = (piecesObtainedCount / pieces.length) * 100;
 			if(percentageComplete > 10) {
-				this.removeObtainedPieces();
+			//	this.removeObtainedPieces();
 			}
 		}
 	}
 
 	@Override
 	public void pieceUnobtained(int piece) {
-		// TODO Auto-generated method stub
+		piecesInProgress.remove(piece);
 	}
 	
 	private void removeObtainedPieces() {
@@ -146,8 +152,9 @@ public class RarestFirst extends PiecePicker {
 	
 	private int[][] pieces;
 	private HashSet<Integer> piecesInProgress = new HashSet<Integer>();
-	private int piecesObtainedCount;
+	private int piecesObtainedCount = 0;
+	private int piecesRequested = 0;
 	private int totalNumPieces;
-	private long finalPieceSize;
+	
 
 }
