@@ -35,7 +35,6 @@ public class TorrentFile {
 		
 		
 		HashMap<String, Object> infoDict = (HashMap<String, Object>) parsedFile.get("info");
-		//newFileLocation = Paths.get(String.format("%s%s%s%s%s", System.getProperty("user.home"), File.separator, "Downloads", File.separator, (String) infoDict.get("name")));
 		fileSize = (long) infoDict.get("length");
 	}
 	
