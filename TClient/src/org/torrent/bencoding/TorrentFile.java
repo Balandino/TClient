@@ -11,7 +11,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.logging.Level;
 
 import org.torrent.coredata.ChannelData;
 import org.torrent.coredata.FlowControls.TorrentStatus;
