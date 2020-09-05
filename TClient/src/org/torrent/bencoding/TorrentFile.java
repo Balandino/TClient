@@ -1,23 +1,21 @@
 package org.torrent.bencoding;
 
-import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.logging.Level;
 
 import org.torrent.coredata.ChannelData;
 import org.torrent.coredata.FlowControls.TorrentStatus;
 
-@SuppressWarnings("unused")
 public class TorrentFile {
 
 	
@@ -48,7 +46,6 @@ public class TorrentFile {
 	
 	public void updateDownloadedBytesCount(int num) {
 		amountDownloaded += num;
-		System.out.println("Amount Downloaded: " + amountDownloaded + "  File Size: " + fileSize);
 	}
 	
 	public long getfileSize() {
@@ -172,6 +169,10 @@ public class TorrentFile {
 		trackerRefreshTime = System.currentTimeMillis() + interval;
 	}
 	
+	public long getTRackerRefreshTime() {
+		return trackerRefreshTime;
+	}
+	
 	public int getNumDownloadingConns() {
 		return numDownloadingConns;
 	}
@@ -215,7 +216,6 @@ public class TorrentFile {
 	private URL tracker;
 	
 	
-	private int numSeedingConns = 0;
 	private int numDownloadingConns = 0;
 	private long amountDownloaded = 0;
 	private long fileSize;

@@ -14,8 +14,6 @@ public class Tester {
 		TClient client = new TClient();
 		
 		Files.deleteIfExists(Paths.get("./Output/Debian-ISO.iso"));
-		Files.deleteIfExists(Paths.get("/home/mkg/Desktop/debugMsgs"));//DEBUG
-		
 		client.downloadFile(Paths.get("./Debian ISO/debian-10.4.0-amd64-netinst.iso.torrent"), Paths.get("./Output/Debian-ISO.iso"), PieceSelectionPolicy.RarestFirst);
 		
 		

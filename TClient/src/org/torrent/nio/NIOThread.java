@@ -2,9 +2,6 @@ package org.torrent.nio;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.ClosedChannelException;
@@ -12,51 +9,65 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
+import java.util.logging.ConsoleHandler;
+import java.util.logging.FileHandler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.IntStream;
 
-import org.torrent.bencoding.BencodeParser;
 import org.torrent.bencoding.TorrentFile;
 import org.torrent.bencoding.TorrentFile.PieceSelectionPolicy;
 import org.torrent.coredata.BitfieldOperations;
 import org.torrent.coredata.ChannelData;
-import org.torrent.coredata.FlowControls;
 import org.torrent.coredata.FlowControls.ChannelStatus;
 import org.torrent.coredata.FlowControls.TorrentStatus;
+import org.torrent.logging.ConsoleFormatter;
+import org.torrent.logging.FileFormatter;
 import org.torrent.coredata.Peer;
 import org.torrent.coredata.PeerManager;
 import org.torrent.coredata.PiecePicker;
 import org.torrent.coredata.RarestFirst;
 
-@SuppressWarnings("unused")
 public class NIOThread extends Thread {
 	
 	
 	@Override
 	public void run() {
-		//Create an id for our client
-		peerID = this.getSessionPeerID();
-		
 		//Generate Selector
 		try {
+			
+			logger = Logger.getLogger("TClient");
+			
+			// LOG this level to the log
+	        logger.setLevel(Level.CONFIG);
+	        logger.setUseParentHandlers(false);
+	        
+	        ConsoleHandler newHandler = new ConsoleHandler();
+	        newHandler.setLevel(Level.CONFIG);
+	        newHandler.setFormatter(new ConsoleFormatter());
+	        logger.addHandler(newHandler);
+	        
+	        FileHandler fileHandler = new FileHandler("./Logs/Logs.txt");
+	        fileHandler.setFormatter(new FileFormatter());
+	        logger.addHandler(fileHandler);
+			
+			//Create an id for our client
+			peerID = this.getSessionPeerID();
+			
+			
+			
 			Selector selector = Selector.open();
 			while(!nioShutdown) {
 				if(torrentsToProcess.size() > 0) {
@@ -85,18 +96,9 @@ public class NIOThread extends Thread {
 										Peer peer = pm.getPeer();
 										SocketChannel channel = SocketChannel.open();
 										channel.configureBlocking(false);
-										System.out.println("IP: " + peer.getIP() + " Port: " + peer.getPort());
-										
-										//FOR TESTING ONLY
-										//channel.connect(new InetSocketAddress("5.9.144.2", 54321)); //Works
-										
-										//channel.connect(new InetSocketAddress("45.238.4.238", 23711)); //Errors
-										//channel.connect(new InetSocketAddress("24.209.179.35", 63550)); //Errors
-										
+										logger.log(Level.INFO, new String("Connecting to Peer: " + peer.getIP() + ":" + peer.getPort()));
 										channel.connect(new InetSocketAddress(peer.getIP(), peer.getPort()));
-										
 										SelectionKey newKey = channel.register(selector, SelectionKey.OP_CONNECT);
-										System.out.println("Registered with selector!");
 										ChannelData channelData = new ChannelData(storesKey, peer, ChannelStatus.CONTACTING_PEER, channel);
 										channelData.setTimeout(connectionTimeout);
 										tf.addNewDownloadingConn(channel);
@@ -105,7 +107,7 @@ public class NIOThread extends Thread {
 										newKey.attach(channelData);
 										channelData.setCurrentKey(newKey);
 									} else {
-										System.out.println("NumConns: " + tf.getNumDownloadingConns() + " Collected: " + tf.getAmountDownloaded());
+										
 										if(tf.getNumDownloadingConns() == 0) {
 											nioShutdown = true;
 										}
@@ -119,9 +121,12 @@ public class NIOThread extends Thread {
 							ChannelData cData = timeoutIterator.next();
 							if(cData.checkForTimeout()) {
 								timeoutIterator.remove();
-								System.out.println("Timeout Occured!");
+								logger.log(Level.WARNING, "Timeout occured!," + "Channel: " + cData.getChannelNum() + " Remaining Peers: " + peerManagers.get(cData.getNioKey()).numAvailablePeers());
 								tf.removeChannelData(cData);
 								tf.removeDownloadingConn(cData.getChannel());
+								if(cData.getPiece() != -1) {
+									PiecePickers.get(cData.getNioKey()).pieceUnobtained(cData.getPiece());
+								}
 								cData.getCurrentKey().cancel();
 							}
 						}
@@ -142,7 +147,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isAcceptable()) {
-					//	System.out.println("FLOW: isAcceptable()");
+						logger.log(Level.FINEST, "FLOW: isAcceptable()");
 					}
 					
 					/*===============================================================================================================================================*\
@@ -156,7 +161,7 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isConnectable()) {
-					//	System.out.println("FLOW: isConnectable()");
+						logger.log(Level.FINEST, "FLOW: isConnectable()");
 						
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
@@ -170,7 +175,7 @@ public class NIOThread extends Thread {
 							
 						} catch (IOException io) {
 							this.closeConnection(channelData, torrentsProcessing.get(channelData.getNioKey()), key);
-							System.err.println("Error connecting: " + io.getMessage() + System.lineSeparator() + "Terminating connection");
+							logger.log(Level.WARNING, "Error connecting: " + io.getMessage() + ", " + "Terminating connection");
 						}
 					}
 					
@@ -186,30 +191,28 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isReadable()) {
-					//	System.out.println("FLOW: isReadable()");
+						logger.log(Level.FINEST, "FLOW: isReadable()");
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
 						int channelNioKey = channelData.getNioKey();
 						timeoutStore.remove(channelData);
 						
-						//System.out.println("Status: " + channelData.getStatus() + " Choked: " + channelData.isChoked());
-						
 						try {
 							String result = this.receiveMessage(channelData, channel);
 							if(result == null) {
 								this.closeConnection(channelData, torrentsProcessing.get(channelData.getNioKey()), key);
-								System.err.println("Error reading: Bad data received" + System.lineSeparator() + "Terminating connection");
+								logger.log(Level.WARNING, "Error reading: Bad data received" + "," + "Terminating connection");
 							} else if(result.equals("Tracker Response Parsed")) {
 								key.cancel();
 							} else if(result.equals("No Data")) {
 								this.closeConnection(channelData, torrentsProcessing.get(channelData.getNioKey()), key);
-								System.err.println("Error reading: No data" + System.lineSeparator() + "Terminating connection");
+								logger.log(Level.WARNING, "Error reading: No Data" + "," + "Terminating connection");
 							} else if(result.equals("OK")) {//Read messages successfully
 								int processedDataKey = this.processData(channelData);
 								
 								if(processedDataKey == -3) {
 									this.closeConnection(channelData, torrentsProcessing.get(channelNioKey), channelData.getCurrentKey());
-									System.out.println("No piece available");
+									logger.log(Level.WARNING, "No Piece Available");
 									break;
 								}
 								
@@ -218,7 +221,7 @@ public class NIOThread extends Thread {
 								}
 								
 								if(processedDataKey == -1) {//Error occured
-									System.err.println("Error processing data: " + processedDataKey);
+									logger.log(Level.WARNING, "Error processing data: " + processedDataKey);
 									this.closeConnection(channelData, torrentsProcessing.get(channelNioKey), channelData.getCurrentKey());
 								}
 								
@@ -232,12 +235,12 @@ public class NIOThread extends Thread {
 									channelData.setCurrentKey(newKey);
 								}
 							} else {
-								System.out.println("Error reading message!");
+								logger.log(Level.WARNING, "Error reading message!");
 								this.closeConnection(channelData, torrentsProcessing.get(channelNioKey), channelData.getCurrentKey());
 							}
 						} catch(IOException io) {
 							this.closeConnection(channelData, torrentsProcessing.get(channelData.getNioKey()), key);
-							System.err.println("Error reading: " + io.getMessage() + System.lineSeparator() + "Terminating connection");
+							logger.log(Level.WARNING, "Error reading: " + io.getMessage() + "," + "Terminating connection");
 						}
 					}
 					
@@ -252,19 +255,21 @@ public class NIOThread extends Thread {
 					\*===============================================================================================================================================*/
 					
 					if(key.isValid() && key.isWritable()) {
-					//	System.out.println("FLOW: isWritable()");
+						logger.log(Level.FINEST, "FLOW: isWritable()");
 						
 						
 						SocketChannel channel = (SocketChannel)key.channel();
 						ChannelData channelData = (ChannelData)key.attachment();
 						
 						
-						//System.out.println("Status: " + channelData.getStatus() + " Choked: " + channelData.isChoked());
-						
-						
 						int processedDataKey = this.processData(channelData);
 						if(channelData.hasMessages()) {
-							channel.write(ByteBuffer.wrap(channelData.getOutboundMessages()));
+							try {
+								this.writeData(channel, channelData);
+							} catch(IOException io) {
+								logger.log(Level.WARNING, "Write Error: " + io.getMessage() + ", Terminating Connection");
+								this.closeConnection(channelData, torrentsProcessing.get(channelData.getNioKey()), key);
+							}
 						}
 						
 						if(processedDataKey == 1) {//Read
@@ -286,7 +291,7 @@ public class NIOThread extends Thread {
 				}
 			}
 		} catch (IOException io) {
-			System.err.println("Error: IO Exception has occured");
+			logger.log(Level.SEVERE, "IO Error: " + io.getMessage());
 			io.printStackTrace();
 		}
 	}
@@ -308,7 +313,7 @@ public class NIOThread extends Thread {
 	\*==================================*/
 	
 	private int processData(ChannelData channelData) {
-		//System.out.println("Processing Data: " + channelData.getStatus());
+		logger.log(Level.FINEST, "Processing Data: " + channelData.getStatus());
 		while(true) {
 			ChannelStatus status = channelData.getStatus();
 			Integer channelNioKey = channelData.getNioKey();
@@ -347,7 +352,6 @@ public class NIOThread extends Thread {
 			
 			if(status == ChannelStatus.CHECKING_FOR_PIECE) {
 				picker = PiecePickers.get(channelNioKey);
-				System.out.println("Checking for Piece, available?: " + picker.pieceAvailable(channelData.getPeer().getBitfield()));
 				if(picker.pieceAvailable(channelData.getPeer().getBitfield())) {
 					byte[] interested = new byte[] {0, 0, 0, 1, 2};
 					channelData.addMessage(interested);
@@ -356,7 +360,6 @@ public class NIOThread extends Thread {
 						channelData.setStatus(ChannelStatus.PROCESSING_MESSAGES);	
 						continue;
 					} else {
-						//TODO Need to add interested message
 						channelData.setStatus(ChannelStatus.PROCESSING_MESSAGES);
 						return SelectionKey.OP_WRITE;
 					}
@@ -368,13 +371,12 @@ public class NIOThread extends Thread {
 			if(status == ChannelStatus.PROCESSING_MESSAGES) {
 				if(!channelData.isChoked()) {
 					if(!channelData.pieceSet()) {
-						System.out.println("Processing Messages, available?: " + picker.pieceAvailable(peer.getBitfield()));
 						if(picker.pieceAvailable(peer.getBitfield())) {
 							channelData.setPiece(picker.getPiece(peer.getBitfield()));
-							System.out.println("Setting Piece: " + channelData.getPiece() + "  Channel: " + channelData.getChannelNum());
+							logger.log(Level.INFO, "Setting Piece: " + channelData.getPiece() + "  Channel: " + channelData.getChannelNum());
 						} else {
 							if(torrentsProcessing.get(channelNioKey).fileComplete()) {
-								System.out.println("File Complete!");
+								logger.log(Level.INFO, "File Complete!");
 								return -2;
 							} else {
 								return -3;
@@ -382,34 +384,24 @@ public class NIOThread extends Thread {
 						}
 					} 
 					
-					if(!picker.endGameEnabled()) {
-						if(!channelData.blocksRequested()) {
-							byte[][] requests = channelData.getBlockRequests((int)torrentsProcessing.get(channelNioKey).getPieceSize(), channelData.getPiece(), blockReqSize);
-							byte[] blockTracker = channelData.getBlocksRequested();
-							for(int i = 0; i < requests.length; i++) {
-								if(blockTracker[i] != -1) {
-									channelData.addMessage(requests[i]);
-									channelData.setBlockRequested(i);
-								}
+					if(!channelData.blocksRequested()) {
+						byte[][] requests = channelData.getBlockRequests((int)torrentsProcessing.get(channelNioKey).getPieceSize(), channelData.getPiece(), blockReqSize);
+						byte[] blockTracker = channelData.getBlocksRequested();
+						for(int i = 0; i < requests.length; i++) {
+							if(blockTracker[i] != -1) {
+								channelData.addMessage(requests[i]);
+								channelData.setBlockRequested(i);
 							}
-							return SelectionKey.OP_WRITE;									
-						} else {
-							//TODO Blocks already requested
-							return SelectionKey.OP_READ;
 						}
+						return SelectionKey.OP_WRITE;									
 					} else {
-						System.out.println("End Game");
-						//TODO End Game
+						return SelectionKey.OP_READ;
 					}
 				} else {
-					//TODO Channel is choked
 					return SelectionKey.OP_READ;
 				}
-				
-				break;
 			}
 		}
-		return -1;
 	}
 	
 	
@@ -432,6 +424,7 @@ public class NIOThread extends Thread {
 	
 	//String will need to contain a relevant error message if a fault is detected
 	private String receiveMessage(ChannelData channelData, SocketChannel channel /*byte[] msgData*/) throws IOException {
+		logger.log(Level.FINEST, "Receiving Message: " + channelData.getStatus());
 		
 		String result = "OK";
 		Integer channelNioKey = channelData.getNioKey();
@@ -446,11 +439,11 @@ public class NIOThread extends Thread {
 		} else if(channelData.getStatus() == ChannelStatus.WAITING_BITFIELD) {
 			msgBuffer = ByteBuffer.allocate(1000);
 		} else {
-			System.out.println("Channel Status for 17000: " + channelData.getStatus());
+			logger.log(Level.SEVERE, "Channel Status for 17000: " + channelData.getStatus());
 			msgBuffer = ByteBuffer.allocate(17000);
 		}
 		
-		int bytesReadNum = channel.read(msgBuffer);
+		channel.read(msgBuffer);
 		if(msgBuffer.position() == 0) {
 			return "No Data";
 		}
@@ -511,6 +504,9 @@ public class NIOThread extends Thread {
 						
 						int piece = ByteBuffer.wrap(Arrays.copyOfRange(msg, 1, 5)).getInt();
 						picker.processHave(piece);
+						if(peer.getBitfield() == null) {//Some peers erroneously send have messages instead of a bitfield
+							return null;
+						}
 						peer.processHave(piece);
 					break;
 				}
@@ -534,19 +530,22 @@ public class NIOThread extends Thread {
 						
 						if(channelData.pieceComplete()) {
 							if(torrentFile.validatePiece(channelData.getBlocksCollected().array(), piece) == 0) {
-								try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(torrentFile.getOutputFileLocation(), EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))){
-									byte[] pieceBlocks = channelData.getBlocksCollected().array();
-									MappedByteBuffer mapBuff = fileChannel.map(FileChannel.MapMode.READ_WRITE, pieceBlocks.length * piece, pieceBlocks.length);
-									mapBuff.put(pieceBlocks);
-									torrentFile.updateDownloadedBytesCount(pieceBlocks.length);
-								} catch (IOException io){
-									//TODO File Write Error
-									System.err.println("Error writing to file.");
-									io.printStackTrace();
-									System.exit(0);
-								}
+								PiecePicker picker = PiecePickers.get(channelNioKey);
+									if(!picker.pieceAlreadyObtained(piece)) {//Check in place to prevent pieces overwriting each other in End Game mode
+										try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(torrentFile.getOutputFileLocation(), EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))){
+											byte[] pieceBlocks = channelData.getBlocksCollected().array();
+											MappedByteBuffer mapBuff = fileChannel.map(FileChannel.MapMode.READ_WRITE, pieceBlocks.length * piece, pieceBlocks.length);
+											mapBuff.put(pieceBlocks);
+											torrentFile.updateDownloadedBytesCount(pieceBlocks.length);
+											logger.log(Level.INFO, "Amount Downloaded: " + torrentFile.getAmountDownloaded()+ " File Size: " + torrentFile.getfileSize());
+										} catch (IOException io){
+											logger.log(Level.SEVERE, "Setting Piece: " + "Error writing to file: " + io.getMessage() + System.lineSeparator() + "Exiting");
+											System.exit(0);
+										}
+									}
 								
-								PiecePickers.get(channelNioKey).pieceObtained(pieceIndex);
+								picker.pieceObtained(pieceIndex);
+								logger.log(Level.CONFIG, "Piece obtained: " + piece + " Channel: " + channelData.getChannelNum());
 								channelData.setPiece(-1);
 								channelData.clearBlockData();
 								
@@ -556,7 +555,7 @@ public class NIOThread extends Thread {
 									if(bitfield != null) {
 										if(!BitfieldOperations.checkBit(pieceIndex, bitfield)) {
 											byte[] haveMsg = new byte[] {0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x04, pieceIndexBytes[0], pieceIndexBytes[1], pieceIndexBytes[2], pieceIndexBytes[3]};
-											cData.addMessage(msgData);
+											cData.addMessage(haveMsg);
 										}
 									}
 								}
@@ -620,8 +619,6 @@ public class NIOThread extends Thread {
 					return null;
 				}
 				
-				
-				byte msgID = allMsgBytes[index + 4];
 				index += 4;
 				if((allMsgBytes.length - index) >= msgLength ) {//Amount remaining is enough for whole message
 					byte[] newMessage = new byte[msgLength];
@@ -645,10 +642,6 @@ public class NIOThread extends Thread {
 	}
 	
 	
-	private void writeMessage(SocketChannel channel, byte[] message) throws IOException {
-		channel.write(ByteBuffer.wrap(message));
-	}
-	
 	private SelectionKey assignReadWithTimeout(Selector selector, SocketChannel channel, ChannelData channelData, int timeout) throws ClosedChannelException {
 		channelData.setTimeout(timeout);
 		timeoutStore.add(channelData);
@@ -656,7 +649,9 @@ public class NIOThread extends Thread {
 	}
 	
 	private void closeConnection(ChannelData channelData, TorrentFile tf, SelectionKey key) throws IOException {
-		System.out.println("Closing Channel: " + channelData.getChannelNum() + " With piece: " + channelData.getPiece());
+		logger.log(Level.WARNING, "IO Error: " + "Closing Channel: " + channelData.getChannelNum() + " With piece: " + channelData.getPiece());
+		
+	
 		SocketChannel channel = channelData.getChannel();
 		tf = torrentsProcessing.get(channelData.getNioKey());
 		tf.removeChannelData(channelData);
@@ -666,13 +661,10 @@ public class NIOThread extends Thread {
 		key.cancel();
 	}
 	
-	//DEBUG 
-	private void hexPrint(byte[] bytes) {
-		for(byte b : bytes) {
-			System.out.print(String.format("%02X", ((byte)b) & 0xFF).toUpperCase() + " ");
-		}
-		System.out.println();
+	private void writeData(SocketChannel channel, ChannelData channelData) throws IOException {
+		channel.write(ByteBuffer.wrap(channelData.getOutboundMessages()));
 	}
+	
 	private byte[] getHandshake(TorrentFile tf) {
 		ByteBuffer buff = ByteBuffer.allocate(68);
 		buff.put((byte) 19); //pstrlen
@@ -730,9 +722,9 @@ public class NIOThread extends Thread {
 		PieceSelectionPolicy policy = torrentsProcessing.get(channelNioKey).getPieceSelectionPolicy();
 		TorrentFile tf = torrentsProcessing.get(channelNioKey);
 		if(policy == PieceSelectionPolicy.RarestFirst) {
-			PiecePickers.put(channelNioKey, new RarestFirst(tf.getNumPieces()));
+			PiecePickers.put(channelNioKey, new RarestFirst(tf.getNumPieces(), logger));
 		} else {
-			System.err.println("Error: No piece selection policy set");
+			logger.log(Level.SEVERE, "Error: No piece selection policy set");
 			System.exit(0);
 		}
 	}
@@ -758,14 +750,13 @@ public class NIOThread extends Thread {
 		if(matcher.find()) {
 			torrentsProcessing.get(channelNioKey).setTrackerRefreshTime(Integer.valueOf(matcher.group(1)));
 		} else {
-			System.err.println("Error: Unable to parse tracker interval time");
+			logger.log(Level.SEVERE, "Error: Unable to parse tracker interval time");
 			System.exit(0);
 		}
 		
 		String[] lines = response.split("\\r\\n");
 		response = (lines[lines.length -1]);
-		matcher = Pattern.compile("ip[0-9]{2}:[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}4:porti[0-9]{4}")
-				.matcher(response);
+		matcher = Pattern.compile("ip[0-9]{2}:[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}4:porti[0-9]{4}").matcher(response);
 		
 		PeerManager peerManager = new PeerManager();
 		if(matcher.find()) {//Dictionary Model
@@ -798,15 +789,28 @@ public class NIOThread extends Thread {
 					i += 2;
 				}
 			} else {
-				// TODO Need to handle different tracker errors
-				System.err.println("Unable to parse tracker response. Exiting.");
+				logger.log(Level.SEVERE, "Unable to parse tracker response. Exiting.");
 				System.exit(0);
 			}
 			peerManagers.put(channelNioKey, peerManager);
 		}
 	}
 	
-		
+	public Logger getLogger() {
+		return logger;
+	}
+	
+	
+	public volatile int maxNumDownloadingConns = 40;
+	public volatile int maxNumSeedingConns = 0;
+	public volatile boolean seedAfterwards = true; 
+	public volatile boolean nioShutdown = false;
+	public int blocksWaiting = 10;
+	public int readTimeout = 10;
+	public int connectionTimeout = 4;
+	
+	protected volatile HashSet<TorrentFile> torrentsToProcess = new HashSet<TorrentFile>();
+	
 	private HashMap<Integer, TorrentFile> torrentsProcessing = new HashMap<Integer, TorrentFile>();
 	private HashMap<Integer, PeerManager> peerManagers = new HashMap<Integer, PeerManager>();
 	private HashMap<Integer, PiecePicker> PiecePickers  = new HashMap<Integer, PiecePicker>();
@@ -817,18 +821,5 @@ public class NIOThread extends Thread {
 	private int myListeningPort = 6888;
 	private int blockReqSize = 16000;
 	
-	protected volatile HashSet<TorrentFile> torrentsToProcess = new HashSet<TorrentFile>();
-	
-	public volatile HashMap<Path, Boolean> shutdown = new HashMap<Path, Boolean>();
-	public volatile int maxNumDownloadingConns = 10;
-	public volatile int maxNumSeedingConns = 0;
-	public volatile boolean seedAfterwards = true; 
-	public volatile boolean nioShutdown = false;
-	public int blocksWaiting = 10;
-	public int readTimeout = 10;
-	public int connectionTimeout = 4;
-	
-	private static long byteCount = 0;
-	
-		
+	private Logger logger;
 }

@@ -4,11 +4,9 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayDeque;
-import java.util.Iterator;
 
 import org.torrent.coredata.FlowControls.ChannelStatus;
 
-@SuppressWarnings("unused")
 public class ChannelData {
 	
 	public ChannelData(Integer nioKey, Peer newPeer, ChannelStatus status, SocketChannel socketChannel) {
@@ -273,20 +271,17 @@ public class ChannelData {
 	
 	private ArrayDeque<byte[]> outboundQueue = new ArrayDeque<byte[]>();
 	private int outBoundQueueLength = 0;
-	private long interestTimeout;
 	private long lastActionTime;
 	private int timeout;
 	private ChannelStatus channelStatus;
 	private Boolean[] connectionStatus = new Boolean[]{false, true, false, true};
 	private Integer nioStoresKey;
-	private boolean seedingApproved = true;
 	private int piece = -1;
 	private byte[][] blockRequests;
 	private byte[] blocksRequested = null;
 	private ByteBuffer blocksCollected = null;
 	private byte[] storedTcpPacketBytes = null;
 	private SocketChannel channel;
-	private int numBlocksRequested = 0;
 	private Peer peer;
 	private SelectionKey currentKey = null;
 	private int channelNum;

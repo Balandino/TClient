@@ -21,6 +21,10 @@ public class PeerManager {
 		return (peers.size() > 0) ? true : false;
 	}
 	
+	public int numAvailablePeers() {
+		return peers.size();
+	}
+	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder("Peers" + System.lineSeparator() + "====================" + System.lineSeparator());

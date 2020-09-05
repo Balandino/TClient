@@ -10,6 +10,8 @@ public abstract class PiecePicker {
 	
 	public abstract boolean endGameEnabled();
 	
+	public abstract boolean pieceAlreadyObtained(int piece);
+	
 	public abstract void processHave(int piece);
 	
 	public abstract void pieceObtained(int piece);
