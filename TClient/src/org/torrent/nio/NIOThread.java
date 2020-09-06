@@ -11,6 +11,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -217,6 +218,12 @@ public class NIOThread extends Thread {
 								}
 								
 								if(processedDataKey == -2) {//File download complete
+									
+									byte[] myFile = Files.readAllBytes(Paths.get("./Output/Debian-ISO.iso"));
+									byte[] verifiedFile = Files.readAllBytes(Paths.get("./Verified/debian-10.4.0-amd64-netinst.iso"));
+									
+									boolean validates = Arrays.equals(myFile, verifiedFile);
+									logger.log(Level.INFO, "Validation: " + validates);
 									break;
 								}
 								
