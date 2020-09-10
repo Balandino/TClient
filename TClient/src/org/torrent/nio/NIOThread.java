@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
@@ -51,12 +52,15 @@ public class NIOThread extends Thread {
 			
 			logger = Logger.getLogger("TClient");
 			
+			//Logger level
+			Level loggerLevel = Level.INFO;
+			
 			// LOG this level to the log
-	        logger.setLevel(Level.CONFIG);
+	        logger.setLevel(loggerLevel);
 	        logger.setUseParentHandlers(false);
 	        
 	        ConsoleHandler newHandler = new ConsoleHandler();
-	        newHandler.setLevel(Level.CONFIG);
+	        newHandler.setLevel(loggerLevel);
 	        newHandler.setFormatter(new ConsoleFormatter());
 	        logger.addHandler(newHandler);
 	        
@@ -70,6 +74,7 @@ public class NIOThread extends Thread {
 			
 			
 			Selector selector = Selector.open();
+			start = System.nanoTime();
 			while(!nioShutdown) {
 				if(torrentsToProcess.size() > 0) {
 					for(TorrentFile tf : torrentsToProcess) {
@@ -219,11 +224,13 @@ public class NIOThread extends Thread {
 								
 								if(processedDataKey == -2) {//File download complete
 									
-									byte[] myFile = Files.readAllBytes(Paths.get("./Output/Debian-ISO.iso"));
-									byte[] verifiedFile = Files.readAllBytes(Paths.get("./Verified/debian-10.4.0-amd64-netinst.iso"));
 									
-									boolean validates = Arrays.equals(myFile, verifiedFile);
-									logger.log(Level.INFO, "Validation: " + validates);
+									if(Files.exists(Paths.get("./Output/Debian-ISO.iso")) && Files.exists(Paths.get("./Verified/debian-10.4.0-amd64-netinst.iso"))) {
+										byte[] myFile = Files.readAllBytes(Paths.get("./Output/Debian-ISO.iso"));
+										byte[] verifiedFile = Files.readAllBytes(Paths.get("./Verified/debian-10.4.0-amd64-netinst.iso"));
+										boolean validates = Arrays.equals(myFile, verifiedFile);
+										logger.log(Level.INFO, "Validation: " + validates);									
+									}
 									break;
 								}
 								
@@ -384,6 +391,16 @@ public class NIOThread extends Thread {
 						} else {
 							if(torrentsProcessing.get(channelNioKey).fileComplete()) {
 								logger.log(Level.INFO, "File Complete!");
+								
+								end = System.nanoTime();
+								long seconds = (end - start) / 1_000_000_000;
+								
+								long minutes = TimeUnit.SECONDS.toMinutes(seconds);
+								seconds -= TimeUnit.MINUTES.toSeconds(minutes);
+								
+								
+								logger.log(Level.INFO, "Completed in: " + minutes + ((minutes == 1)? " Minutes " : " Minute") + seconds + ((seconds > 1)? " Seconds" : " Second")); 
+								
 								return -2;
 							} else {
 								return -3;
@@ -827,6 +844,9 @@ public class NIOThread extends Thread {
 	private StringBuilder peerID = new StringBuilder("TM470");
 	private int myListeningPort = 6888;
 	private int blockReqSize = 16000;
+	
+	private long start;
+	private long end;
 	
 	private Logger logger;
 }
