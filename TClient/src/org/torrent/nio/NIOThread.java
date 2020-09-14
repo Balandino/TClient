@@ -42,9 +42,15 @@ import org.torrent.coredata.PeerManager;
 import org.torrent.coredata.PiecePicker;
 import org.torrent.coredata.RarestFirst;
 
+/**
+ * 
+ * @author mkg
+ *
+ */
 public class NIOThread extends Thread {
-	
-	
+	/**
+	 * The method used to initiate and run NIOThread
+	 */
 	@Override
 	public void run() {
 		//Generate Selector
@@ -70,8 +76,6 @@ public class NIOThread extends Thread {
 			
 			//Create an id for our client
 			peerID = this.getSessionPeerID();
-			
-			
 			
 			Selector selector = Selector.open();
 			start = System.nanoTime();
@@ -131,7 +135,7 @@ public class NIOThread extends Thread {
 								tf.removeChannelData(cData);
 								tf.removeDownloadingConn(cData.getChannel());
 								if(cData.getPiece() != -1) {
-									PiecePickers.get(cData.getNioKey()).pieceUnobtained(cData.getPiece());
+									piecePickers.get(cData.getNioKey()).pieceUnobtained(cData.getPiece());
 								}
 								cData.getCurrentKey().cancel();
 							}
@@ -326,12 +330,19 @@ public class NIOThread extends Thread {
 	 *  Write & Connect: 5				*
 	\*==================================*/
 	
+	/**
+	 * This method determines the next action a connection needs to take by processing various data and returning a key to register with the selector.
+	 * This method will also return -3 if the connected peer has no piece we want, or -2 if we have gathered all the pieces of the file we are downloading.
+	 * 
+	 * @param channelData The channelData object for the connection
+	 * @return A SelectionKey for registering with the selector, or a specified negative number to indicate no further processing is necessary
+	 */
 	private int processData(ChannelData channelData) {
 		logger.log(Level.FINEST, "Processing Data: " + channelData.getStatus());
 		while(true) {
 			ChannelStatus status = channelData.getStatus();
 			Integer channelNioKey = channelData.getNioKey();
-			PiecePicker picker = PiecePickers.get(channelNioKey);
+			PiecePicker picker = piecePickers.get(channelNioKey);
 			TorrentFile tf = torrentsProcessing.get(channelData.getNioKey());
 			Peer peer = channelData.getPeer();
 			
@@ -365,7 +376,7 @@ public class NIOThread extends Thread {
 			}
 			
 			if(status == ChannelStatus.CHECKING_FOR_PIECE) {
-				picker = PiecePickers.get(channelNioKey);
+				picker = piecePickers.get(channelNioKey);
 				if(picker.pieceAvailable(channelData.getPeer().getBitfield())) {
 					byte[] interested = new byte[] {0, 0, 0, 1, 2};
 					channelData.addMessage(interested);
@@ -394,12 +405,9 @@ public class NIOThread extends Thread {
 								
 								end = System.nanoTime();
 								long seconds = (end - start) / 1_000_000_000;
-								
 								long minutes = TimeUnit.SECONDS.toMinutes(seconds);
 								seconds -= TimeUnit.MINUTES.toSeconds(minutes);
-								
-								
-								logger.log(Level.INFO, "Completed in: " + minutes + ((minutes == 1)? " Minutes " : " Minute") + seconds + ((seconds > 1)? " Seconds" : " Second")); 
+								logger.log(Level.INFO, "Completed in: " + minutes + ((minutes == 1)? " Minute " : " Minutes ") + seconds + ((seconds > 1)? " Seconds" : " Second")); 
 								
 								return -2;
 							} else {
@@ -446,8 +454,15 @@ public class NIOThread extends Thread {
 	 *			 Cancel: 8  			*
 	\*==================================*/
 	
-	//String will need to contain a relevant error message if a fault is detected
-	private String receiveMessage(ChannelData channelData, SocketChannel channel /*byte[] msgData*/) throws IOException {
+	/**
+	 * This will process message data received, edit channelData's state if needed and then return a String message
+	 * 
+	 * @param channelData the channelData object associated with the channel
+	 * @param channel The channel receiving the message
+	 * @return "OK": Processed successfully, "Tracker Response Parsed": Tracker response parsed, "No Data": Message received but no data, or null if there is an issue reading the data
+	 * @throws IOException If there is an I/O error in reading the received data from the channel
+	 */
+	private String receiveMessage(ChannelData channelData, SocketChannel channel) throws IOException {
 		logger.log(Level.FINEST, "Receiving Message: " + channelData.getStatus());
 		
 		String result = "OK";
@@ -475,7 +490,7 @@ public class NIOThread extends Thread {
 		byte[] msgData = Arrays.copyOfRange(msgBuffer.array(), 0, msgBuffer.position());
 		if(channelData.getStatus() == ChannelStatus.WAITING_TRACKER_RESPONSE) {
 			this.parseTrackerResponse(msgData, channelNioKey);
-			this.setPieceSelector(channelNioKey);
+			this.setPiecePicker(channelNioKey);
 			torrentsProcessing.get(channelNioKey).setStatus(TorrentStatus.MESSAGING_PEERS);
 			return "Tracker Response Parsed";
 		}
@@ -497,7 +512,7 @@ public class NIOThread extends Thread {
 				
 				case (byte)5:{
 					channelData.getPeer().setBitfield(Arrays.copyOfRange(msg, 1, msg.length));
-					PiecePicker picker = PiecePickers.get(channelNioKey);
+					PiecePicker picker = piecePickers.get(channelNioKey);
 					picker.processBitField(channelData.getPeer().getBitfield());
 					
 					TorrentFile tf = torrentsProcessing.get(channelNioKey);
@@ -523,7 +538,7 @@ public class NIOThread extends Thread {
 				}
 				
 				case (byte)4:{
-						PiecePicker picker = PiecePickers.get(channelNioKey);
+						PiecePicker picker = piecePickers.get(channelNioKey);
 						Peer peer = channelData.getPeer();
 						
 						int piece = ByteBuffer.wrap(Arrays.copyOfRange(msg, 1, 5)).getInt();
@@ -554,7 +569,7 @@ public class NIOThread extends Thread {
 						
 						if(channelData.pieceComplete()) {
 							if(torrentFile.validatePiece(channelData.getBlocksCollected().array(), piece) == 0) {
-								PiecePicker picker = PiecePickers.get(channelNioKey);
+								PiecePicker picker = piecePickers.get(channelNioKey);
 									if(!picker.pieceAlreadyObtained(piece)) {//Check in place to prevent pieces overwriting each other in End Game mode
 										try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(torrentFile.getOutputFileLocation(), EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))){
 											byte[] pieceBlocks = channelData.getBlocksCollected().array();
@@ -596,13 +611,18 @@ public class NIOThread extends Thread {
 				default:
 					result = "Unrecognised Message: " + (byte)msg[0];
 				}
-			
-			
 		}
 		return result;
 	}
 	
-		
+	/**
+	 * This message takes the message bytes received, combines them with any stored bytes in channelData's TCP store
+	 * and breaks the resultant bytes down into individual messages, adding each messageW to the ArrayDeque before returning it
+	 * 	
+	 * @param channelData The channelData object linked to the channel that has received the message
+	 * @param message The message bytes that have been received 
+	 * @return an ArrayDeque of messages to be processed, or null if an error is found in the data received
+	 */
 	private ArrayDeque<byte[]> extractMessages(ChannelData channelData, byte[] message){
 		
 		ArrayDeque<byte[]> parsedMessages = new ArrayDeque<byte[]>();
@@ -665,13 +685,31 @@ public class NIOThread extends Thread {
 		return parsedMessages;
 	}
 	
-	
+	/**
+	 * When a channel is waiting to read a message, it will be registered with timeoutStore, where it will be periodically polled.
+	 * If the timeout time has elapsed, then the connection will be closed
+	 * 
+	 * @param selector The Selector object with which the channel should be registered
+	 * @param channel The channel waiting for a read operation
+	 * @param channelData the channelData object to be linked to the channel
+	 * @param timeout The number of seconds that should be waited before closing the channel
+	 * @return The key registered with the channel and Selector
+	 * @throws ClosedChannelException If the channel is closed when we attempt to register it
+	 */
 	private SelectionKey assignReadWithTimeout(Selector selector, SocketChannel channel, ChannelData channelData, int timeout) throws ClosedChannelException {
 		channelData.setTimeout(timeout);
 		timeoutStore.add(channelData);
 		return channel.register(selector, SelectionKey.OP_READ);
 	}
 	
+	/**
+	 * When a channel needs closing for any reason, this is where it is done.  This will remove its links and decrement the necessary variables
+	 * 
+	 * @param channelData The channelData object associated with the connection
+	 * @param tf The torrent file being processed
+	 * @param key The key currently associated with the connection
+	 * @throws IOException If closing down the channel causes an I/O exception
+	 */
 	private void closeConnection(ChannelData channelData, TorrentFile tf, SelectionKey key) throws IOException {
 		logger.log(Level.WARNING, "IO Error: " + "Closing Channel: " + channelData.getChannelNum() + " With piece: " + channelData.getPiece());
 		
@@ -681,14 +719,26 @@ public class NIOThread extends Thread {
 		tf.removeChannelData(channelData);
 		tf.removeDownloadingConn(channel);
 		channel.close();
-		PiecePickers.get(channelData.getNioKey()).pieceUnobtained(channelData.getPiece());
+		piecePickers.get(channelData.getNioKey()).pieceUnobtained(channelData.getPiece());
 		key.cancel();
 	}
 	
+	/**
+	 * Used for all write operations.
+	 * 
+	 * @param channel The Channel being used to write information
+	 * @param channelData The channelData object for the channel
+	 * @throws IOException If the write operation fails
+	 */
 	private void writeData(SocketChannel channel, ChannelData channelData) throws IOException {
 		channel.write(ByteBuffer.wrap(channelData.getOutboundMessages()));
 	}
 	
+	/**
+	 * 
+	 * @param tf The torrent file we are referencing in our handshake 
+	 * @return A byte array representing the handshake to send
+	 */
 	private byte[] getHandshake(TorrentFile tf) {
 		ByteBuffer buff = ByteBuffer.allocate(68);
 		buff.put((byte) 19); //pstrlen
@@ -702,6 +752,9 @@ public class NIOThread extends Thread {
 	}
 	
 	
+	/**
+	 * @return A reference to this NIOTHread, or a new NIOThread if one hasn't been created
+	 */
 	protected static NIOThread getInstance() {
 		if (nioThread == null) {
 			nioThread = new NIOThread();
@@ -709,6 +762,10 @@ public class NIOThread extends Thread {
 		return nioThread;
 	}
 	
+	/**
+	 * 
+	 * @return A generated peerID for this client to use
+	 */
 	private StringBuilder getSessionPeerID() {
 		peerID.append("-");	
 		for(int i = 0; i < 14; i++) {
@@ -717,10 +774,19 @@ public class NIOThread extends Thread {
 		return peerID;
 	}
 	
+	/**
+	 * 
+	 * @return The port number we are listening on
+	 */
 	private int getPort() {
 		return myListeningPort;
 	}
 	
+	/**
+	 * Generated the HTTP request needed to contact a tracker
+	 * @param tf - The torrent File being worked on
+	 * @return A String representation of the relevant HTTP request
+	 */
 	private String getHTTPRequest(TorrentFile tf) {
 		String endLine = "\r\n";
 		String message = "GET " + 
@@ -741,18 +807,28 @@ public class NIOThread extends Thread {
 		return message;
 	}
 	
-	private void setPieceSelector(Integer channelNioKey){
+	/**
+	 * Sets a pieceSelector for the torrent file download to use.  At the moment, only one type is available
+	 * 
+	 * @param channelNioKey The key which needs associating with the new PiecePicker
+	 */
+	private void setPiecePicker(Integer channelNioKey){
 		//If different policies are added in the future, then this can be expanded
-		PieceSelectionPolicy policy = torrentsProcessing.get(channelNioKey).getPieceSelectionPolicy();
+		PieceSelectionPolicy policy = torrentsProcessing.get(channelNioKey).getPiecePickerPolicy();
 		TorrentFile tf = torrentsProcessing.get(channelNioKey);
 		if(policy == PieceSelectionPolicy.RarestFirst) {
-			PiecePickers.put(channelNioKey, new RarestFirst(tf.getNumPieces(), logger));
+			piecePickers.put(channelNioKey, new RarestFirst(tf.getNumPieces(), logger));
 		} else {
 			logger.log(Level.SEVERE, "Error: No piece selection policy set");
 			System.exit(0);
 		}
 	}
-			
+	
+	/**
+	 * 
+	 * @param array The bytes that require URL conversion
+	 * @return A URL encoded String
+	 */
 	private String urlEncode(byte[] array) {
 		//Pulled from: https://stackoverflow.com/questions/11894945/convert-torrent-info-hash-from-bencoded-to-urlencoded-data
 		StringBuilder encodedString = new StringBuilder(20);
@@ -768,8 +844,13 @@ public class NIOThread extends Thread {
 		return encodedString.toString();
 	}
 	
-	private void parseTrackerResponse(byte[] buffer, Integer channelNioKey) {
-		String response = new String(buffer, StandardCharsets.ISO_8859_1).trim();
+	/**
+	 * 
+	 * @param messageBytes A byte array containing the bytes from the tracker response
+	 * @param channelNioKey The key linked to the torrent file being worked on
+	 */
+	private void parseTrackerResponse(byte[] messageBytes, Integer channelNioKey) {
+		String response = new String(messageBytes, StandardCharsets.ISO_8859_1).trim();
 		Matcher matcher = Pattern.compile("d8:intervali([0-9]+)e").matcher(response);
 		if(matcher.find()) {
 			torrentsProcessing.get(channelNioKey).setTrackerRefreshTime(Integer.valueOf(matcher.group(1)));
@@ -820,33 +901,110 @@ public class NIOThread extends Thread {
 		}
 	}
 	
+	/**
+	 * 
+	 * @return Returns the logger to be used by other classes for printing out information
+	 */
 	public Logger getLogger() {
 		return logger;
 	}
 	
+	/**
+	 * Controls the maximum amount of connections that can operate on a torrent at once
+	 */
+	protected volatile int maxNumDownloadingConns = 40;
 	
-	public volatile int maxNumDownloadingConns = 40;
-	public volatile int maxNumSeedingConns = 0;
-	public volatile boolean seedAfterwards = true; 
-	public volatile boolean nioShutdown = false;
-	public int blocksWaiting = 10;
-	public int readTimeout = 10;
-	public int connectionTimeout = 4;
+	/**
+	 * Controls the maximum amount of connections allowed for seeding (NOT IMPLEMENTED)
+	 */
+	protected volatile int maxNumSeedingConns = 0;
 	
+	/**
+	 * Determines whether seeding is permitted after the download is complete (NOT IMPLEMENTED)
+	 */
+	protected volatile boolean seedAfterwards = true; 
+	
+	/**
+	 * Variable that, when set to true, will result result in NIOThread shutting down.
+	 * Note that this may not be immediate and some processing may take place first
+	 */
+	protected volatile boolean nioShutdown = false;
+	
+	/**
+	 * The number of seconds a connection will wait for a message before timing out and shutting down
+	 */
+	protected int readTimeout = 10;
+	
+	/**
+	 * The number of seconds a connection will wait when connecting to a peer before timing out 
+	 */
+	protected int connectionTimeout = 4;
+	
+	/**
+	 * This contains the torrent files that have been passed to NIOThread by TClient for processing 
+	 */
 	protected volatile HashSet<TorrentFile> torrentsToProcess = new HashSet<TorrentFile>();
 	
+	/**
+	 * This contains torrents that are currently being worked on by NIOthread
+	 */
 	private HashMap<Integer, TorrentFile> torrentsProcessing = new HashMap<Integer, TorrentFile>();
+	
+	/**
+	 * This contains PeerManagers.  They will be linked to the relevant torrent file via the nioKey field.
+	 */
 	private HashMap<Integer, PeerManager> peerManagers = new HashMap<Integer, PeerManager>();
-	private HashMap<Integer, PiecePicker> PiecePickers  = new HashMap<Integer, PiecePicker>();
+	
+	/**
+	 * This contains PiecePickers.  They will be linked to the relevant torrent file via the nioKey field.
+	 */
+	private HashMap<Integer, PiecePicker> piecePickers  = new HashMap<Integer, PiecePicker>();
+	
+	/**
+	 * When a connection is waiting for a message it is referenced here.  This will be polled periodically and if channelData's readTimeout or connectionTimeout 
+	 * have passed, the connection will be closed
+	 */
 	private HashSet<ChannelData> timeoutStore = new HashSet<ChannelData>();
+	
+	/**
+	 * The HashMaps peerManagers, piecePickers and torrentsProcessing all use an Integer as a key.  When a torrent is submitted for processing it will
+	 * be assigned a key, along with its associated PiecePicker and PeerManager.  As a result, this key will link together all the resources working on 
+	 * that particular torrent file.  The channelData objects working on connections linked to the torrent will also hold a reference to this key 
+	 */
 	private Integer nioKey = -1;
+	
+	/**
+	 * Used to help implement a singleton pattern for NIOThread
+	 */
 	private static NIOThread nioThread = null;
+	
+	/**
+	 * Used in the creation of NIOThread's peer id
+	 */
 	private StringBuilder peerID = new StringBuilder("TM470");
+	
+	/**
+	 * The port that we listen for connections on
+	 */
 	private int myListeningPort = 6888;
+	
+	/**
+	 * The size of NIOPThread piece requests
+	 */
 	private int blockReqSize = 16000;
 	
+	/**
+	 * Used to track how long NIOThread has been operating.  This information is used when NIOThread is closing down
+	 */
 	private long start;
+	
+	/**
+	 * Used to track how long NIOThread has been operating.  This information is used when NIOThread is closing down
+	 */
 	private long end;
 	
+	/**
+	 * The logger used to log messages
+	 */
 	private Logger logger;
 }

@@ -17,6 +17,7 @@ public class PieceWriter extends Thread {
 		}
 		
 		
+		
 		@Override
 		public void run() {
 			while(keepRunning || pieceData.size() > 0) {
@@ -33,7 +34,7 @@ public class PieceWriter extends Thread {
 		}
 		
 		
-	public boolean keepRunning = true;
+	private boolean keepRunning = true;
 	private ArrayDeque<byte[]> pieceData = new ArrayDeque<byte[]>();
 	private ArrayDeque<Integer> offsets = new ArrayDeque<Integer>();
 	private ArrayDeque<Path> pathways = new ArrayDeque<Path>();

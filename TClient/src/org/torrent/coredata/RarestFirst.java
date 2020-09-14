@@ -8,6 +8,12 @@ import java.util.logging.Logger;
 
 public class RarestFirst extends PiecePicker {
 	
+	/**
+	 * Contructor
+	 * 
+	 * @param numPieces The amount of pieces that need gathering
+	 * @param logger A logger to output debugging information if required,  Messages in this class are set to CONFIG.
+	 */
 	public RarestFirst(int numPieces, Logger logger) {
 		pieces = new int[numPieces][2];
 		totalNumPieces = numPieces;
@@ -62,7 +68,7 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public boolean pieceAlreadyObtained(int piece) {
-		return endGamepiecesInProgress.contains(piece); 
+		return endGamepiecesObtained.contains(piece); 
 	}
 	
 	@Override
@@ -177,7 +183,7 @@ public class RarestFirst extends PiecePicker {
 		this.updatePieceMark();
 		
 		if(endGame){
-			endGamepiecesInProgress.add(piece);
+			endGamepiecesObtained.add(piece);
 		}
 		
 		
@@ -221,13 +227,42 @@ public class RarestFirst extends PiecePicker {
 		System.out.println();
 	}
 	
+	
+	/**
+	 * A 2D array of all the pieces and their rarity.  The first column tracks piece numbers, with the second column tracking its frequency among connected peers.
+	 */
 	private int[][] pieces;
+	
+	/**
+	 * Stored pieces currently being worked on to prevent them being worked on to prevent them being working on by two channels, which would be inefficient of other pieces are waiting 
+	 */
 	private HashSet<Integer> piecesInProgress = new HashSet<Integer>();
-	private HashSet<Integer> endGamepiecesInProgress = new HashSet<Integer>();
+	
+	/**
+	 * Used to track pieces obtained in endGame
+	 */
+	private HashSet<Integer> endGamepiecesObtained = new HashSet<Integer>();
+	
+	/**
+	 * Tracks how many pieces have been requested.  When all have been requested, End Game is switched on.
+	 */
 	private int piecesRequested = 0;
+	
+	/**
+	 * Stores the total amount of pieces needed.
+	 */
 	private int totalNumPieces;
+	
+	/**
+	 * An optimisation, this marker starts at 0 and moves up the pieces array when possible.  As it moves, everything behind it should be a gathered piece and everything ahead of it should be a 
+	 * piece yet to be gathered.  Various operations in this class will use this marker to indicate the start of the pieces Array, meaning they don't need to iterate over large segments of pieces which have
+	 * already been obtained and thus reducing time spent iterating over the array.
+	 */
 	private int piecesMark = 0;
 	
+	/**
+	 * A logger used to print information if the level is set to CONFIG.
+	 */
 	private Logger logger;
 	
 

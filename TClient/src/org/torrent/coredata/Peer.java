@@ -5,7 +5,6 @@ import java.util.Arrays;
 
 public class Peer {
 	
-	//SHOULD BE Protected, CHANGE BACK WHEN TESTING IS COMPLETE
 	protected Peer(String ipAddress, int portNum) {
 		ip = ipAddress;
 		port = portNum;
@@ -29,6 +28,10 @@ public class Peer {
 	
 	public void setHandShake(byte[] handshakeBytes) {
 		handshake = handshakeBytes;
+	}
+	
+	public byte[] getHandShake() {
+		return handshake;
 	}
 	
 	public String getReservedBytes(byte[] handshake) {
@@ -72,9 +75,6 @@ public class Peer {
 	private String ip;
 	private int port;
 	private byte[] bitfield;
-//	private String reservedBytes;
-//	private byte[] peerID;
-	@SuppressWarnings("unused")
 	private byte[] handshake;
 	private boolean bitFieldSent = false;
 }

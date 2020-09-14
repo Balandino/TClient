@@ -125,7 +125,7 @@ public class TorrentFile {
 		return (long) ((HashMap<String, Object>) parsedFile.get("info")).get("piece length");
 	}
 	
-	public PieceSelectionPolicy getPieceSelectionPolicy() {
+	public PieceSelectionPolicy getPiecePickerPolicy() {
 		return piecePolicy;
 	}
 	
