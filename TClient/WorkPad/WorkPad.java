@@ -1,52 +1,50 @@
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 
-import org.torrent.coredata.PiecePicker;
-
-@SuppressWarnings("unused")
 public class WorkPad {
 	public static void main(String[] args) throws Exception {
 		
 
-//		byte[] data = new byte[16000];
-//		Arrays.fill(data, (byte)1);
-//		
-//		
-//		
-//		Path pathway = Paths.get("/home/mkg/Desktop/WorkpadTest.txt");
-//		Files.deleteIfExists(pathway);
-//		int offset = 0;
-//		
-//		PieceWriter writer = new PieceWriter();
-//		writer.start();
-//		
-//		
-//		long start = System.nanoTime();
-//		
-//		writer.addPiece(data, offset, pathway);
-//		
-//		long end = System.nanoTime();
-//		
-//		System.out.println("WorkPad: " + (end - start) / 1000000 + " Milliseconds");
-//		
-//		
-//		
-//		writer.keepRunning = false;
+		int[][]pieces = new int[5][2];
+		for (int i = 0; i < pieces.length; i++) {
+			pieces[i][0] = i;
+		}
+		
+		WorkPad.printArray(pieces);
 		
 		
-		long start = System.nanoTime();
 		
-		Thread.sleep(4000);
+		pieces[3][1] = -1;
 		
-		long end = System.nanoTime();
+		WorkPad.printArray(pieces);
 		
-		System.out.println((end - start) / 1_000_000_000);
+		Arrays.parallelSort(pieces, (b, a) -> Integer.compare(b[1], a[1]));
 		
 		
+		
+		System.out.println();
+		WorkPad.printArray(pieces);
+		
+		
+		System.out.println();
+		System.out.println((double)7/10 * 100 > 10);
 		
 	}
+	
+	
+	private static void printArray(int[][] pieces) {
+		System.out.print("Pieces: ");
+		for(int i = 0; i < pieces.length; i++) {
+			System.out.print(String.format("%-4s", pieces[i][0]) + " ");
+		}
+		System.out.println();
+		
+		System.out.print("  Freq: ");
+		for(int i = 0; i < pieces.length; i++) {
+			System.out.print(String.format("%-4s", pieces[i][1]) + " ");
+		}
+		System.out.println();
+	}
+	
 }
 	
 	

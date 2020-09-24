@@ -28,8 +28,8 @@ public class ChannelData {
 	/**
 	 * An alternative constructor not requiring a peer.  This will be use for connecting to a tracker
 	 * 
-	 * @param nioKey
-	 * @param status
+	 * @param nioKey The key the channel is to use to access NIOThread HashMaps
+	 * @param status The status the channel will be starting with
 	 */
 	public ChannelData(Integer nioKey, ChannelStatus status) {
 		nioStoresKey = nioKey;
@@ -285,9 +285,9 @@ public class ChannelData {
 	 * based on the blockReqSize.  Array position 1 only contains a value if the last request needs to be a different size than the others.  If it's 
 	 * empty, then the number of requests required resides solely in index position 0, otherwise index 1 contains the size the final request needs to be.
 	 * 
-	 * @param buff 
-	 * @param blockReqSize
-	 * @return
+	 * @param buff A buffer who's length is the total lenght of a piece and who's position reflects the number of blocks obtained 
+	 * @param blockReqSize The size of block the client is requesting
+	 * @return A 2D array of length 2, possibly with an empty second value
 	 */
 	private int[] numRequestsReq(ByteBuffer buff, int blockReqSize) {
 		int[] results = new int[2];
@@ -319,9 +319,9 @@ public class ChannelData {
 	 * Marks the index position in blocksRequested as received.  The index position corresponds to the index position in blockRequests
 	 * representing a piece request message
 	 * 
-	 * @param offset
-	 * @param pieceSize
-	 * @param blockReqSize
+	 * @param offset The bytes representing the int representing the offset in the piece where this block is located
+	 * @param pieceSize The size of the piece
+	 * @param blockReqSize The size of block the client is requesting
 	 */
 	public void setBlockObtained(byte[] offset, int pieceSize, int blockReqSize) {
 		int offsetIndex = ByteBuffer.wrap(offset).getInt();

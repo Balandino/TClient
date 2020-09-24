@@ -9,6 +9,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * This class parses Bencoding and returns a HashMap of the values.  Due to how the parsing occurs, the HashMap contains Object values which trigger warnings.
+ * 
+ * @author mkg
+ *
+ */
 @SuppressWarnings("unchecked")
 public abstract class BencodeParser {
 	
@@ -17,12 +23,23 @@ public abstract class BencodeParser {
 		
 	}
 	
-
-public static HashMap<String, Object> parseBencoding(byte[] bencodedBytes) throws IOException {
+/**
+ * Parses the Bencoded argument
+ * 
+ * @param bencodedBytes Bencoded bytes 
+ * @return A HashMap of the values and keys stored in the Bencoded argument, with values stored as Objects
+ */
+public static HashMap<String, Object> parseBencoding(byte[] bencodedBytes) {
 	return (HashMap<String, Object>)BencodeParser.getNextToken(bencodedBytes, Integer.valueOf(0), Integer.valueOf(0), false, "UTF-8")[0];
 }
 	
-	
+/**
+ * Reads the Bencoded bytes from the argument file and parses the resultant bytes
+ * 	
+ * @param bencodedFile A Bencoded file
+ * @return A HashMap of the values and keys stored in the Bencoded argument, with values stored as Objects
+ * @throws IOException If an error occurs reading the file
+ */
 public static HashMap<String, Object> parseBencoding(Path bencodedFile) throws IOException {
 		return (HashMap<String, Object>)BencodeParser.getNextToken(Files.readAllBytes(bencodedFile), Integer.valueOf(0), Integer.valueOf(0), false, "UTF-8")[0];
 }

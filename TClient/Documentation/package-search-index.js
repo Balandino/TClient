@@ -1,1 +1,1 @@
-packageSearchIndex = [{"l":"All Packages","url":"allpackages-index.html"},{"l":"org.torrent.coredata"}]
+packageSearchIndex = [{"l":"All Packages","url":"allpackages-index.html"},{"l":"org.torrent.bencoding"},{"l":"org.torrent.coredata"},{"l":"org.torrent.logging"},{"l":"org.torrent.nio"}]

@@ -26,14 +26,26 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public int getPiece(byte[] bitfield) {
+		
+		int[] progressPieces = new int[piecesInProgress.size()];
+		int count = 0;
+		for(int piece: piecesInProgress) {
+			progressPieces[count++] = piece; 
+		}
+		Arrays.sort(progressPieces);
+		String arrayString = Arrays.toString(progressPieces);
+		arrayString = arrayString.substring(1, arrayString.length() - 1);
+		
+		
 		int chosenPiece = 0;
 		boolean pieceFound = false;
 		for(int i = piecesMark; i < pieces.length; i++) {
 			if(BitfieldOperations.checkBit(pieces[i][0], bitfield)) {
 				chosenPiece = pieces[i][0];
-				if(chosenPiece != -1) {
+				if(pieces[i][1] != Integer.MIN_VALUE) {
 					if(!endGame) {
 						if(!piecesInProgress.contains(chosenPiece)) {
+							logger.log(Level.CONFIG, "Giving out piece: " + chosenPiece + ", Number of pieces obtained: " + numPiecesObtained + ", Pieces in Progress: " + arrayString + " Size: " + piecesInProgress.size());
 							piecesInProgress.add(pieces[i][0]);
 							pieceFound = true;
 							break;
@@ -51,6 +63,7 @@ public class RarestFirst extends PiecePicker {
 				if(piecesInProgress.size() > 0) {
 					for(int piece: piecesInProgress) {
 						if(BitfieldOperations.checkBit(piece, bitfield)) {
+							logger.log(Level.CONFIG, "Giving out piece in End Game: " + chosenPiece + ", Number of pieces obtained: " + numPiecesObtained + ", Pieces in Progress: " + arrayString + " Size: " + piecesInProgress.size());
 							chosenPiece = piece;
 						}
 					}
@@ -63,6 +76,7 @@ public class RarestFirst extends PiecePicker {
 			}
 		}
 		
+		
 		return chosenPiece;
 	}
 	
@@ -74,23 +88,25 @@ public class RarestFirst extends PiecePicker {
 	@Override
 	public boolean pieceAvailable(byte[] bitfield) {
 		
-		int[] progressPieces = new int[piecesInProgress.size()];
-		int count = 0;
-		for(int piece: piecesInProgress) {
-			progressPieces[count++] = piece; 
+		
+		if(logger.getLevel() == Level.CONFIG) {
+			int[] progressPieces = new int[piecesInProgress.size()];
+			int count = 0;
+			for(int piece: piecesInProgress) {
+				progressPieces[count++] = piece; 
+			}
+			Arrays.sort(progressPieces);
+			String arrayString = Arrays.toString(progressPieces);
+			arrayString = arrayString.substring(1, arrayString.length() - 1);
+			
+			logger.log(Level.CONFIG, "Checking if piece available, Pieces in progress: " + arrayString + " (" + "Size: " + piecesInProgress.size() + ")");
 		}
-		Arrays.sort(progressPieces);
-		String arrayString = Arrays.toString(progressPieces);
-		arrayString = arrayString.substring(1, arrayString.length() - 1);
-		
-		logger.log(Level.CONFIG, "Pieces in progress: " + arrayString + " (" + "Size: " + piecesInProgress.size() + ")");
-		
 		
 		int chosenPiece = 0;
 		for(int i = piecesMark; i < pieces.length; i++) {
 			if(BitfieldOperations.checkBit(pieces[i][0], bitfield)) {
 				chosenPiece = pieces[i][0];
-				if(chosenPiece != -1) {
+				if(pieces[i][1] != Integer.MIN_VALUE) {
 					if(!endGame) {
 						if(!piecesInProgress.contains(chosenPiece)) {
 							return true;
@@ -114,14 +130,17 @@ public class RarestFirst extends PiecePicker {
 	
 	@Override
 	public void processBitField(byte[] bitfield) {
-		for(int i = 0; i < pieces.length; i++) {
+		for(int i = piecesMark; i < pieces.length; i++) {
 			int pieceNum = pieces[i][0];
 			if(BitfieldOperations.checkBit(pieceNum, bitfield)) {
-				pieces[i][1]++;
+				if(pieces[i][1] != Integer.MIN_VALUE) {
+					pieces[i][1]++;
+				}
 			}
 		}
-		Arrays.parallelSort(pieces, (b, a) -> Integer.compare(a[1], b[1]));
+		Arrays.parallelSort(pieces, (b, a) -> Integer.compare(b[1], a[1]));
 		this.updatePieceMark();
+		logger.log(Level.CONFIG, "Sorted Pieces Array!");
 	}
 	
 	@Override
@@ -133,10 +152,10 @@ public class RarestFirst extends PiecePicker {
 	public void processHave(int piece) {
 		int index = 0;
 		int frequency = 0;
-		for(int i = 0; i < pieces.length; i++) {
+		for(int i = piecesMark; i < pieces.length; i++) {
 			if(pieces[i][0] == piece) {
 				
-				if(pieces[i][0] == -1) {//Piece already obtained
+				if(pieces[i][1] == Integer.MIN_VALUE) {//Piece already obtained
 					return;
 				}
 				
@@ -173,33 +192,44 @@ public class RarestFirst extends PiecePicker {
 		int count = piecesMark;
 		while(count < pieces.length) {
 			if(pieces[count][0] == piece) {
-				pieces[count][0] = -1;
+				pieces[count][1] = Integer.MIN_VALUE;
 				break;
 			}
 			count++;
 		}
 		
 		piecesInProgress.remove(piece);
-		this.updatePieceMark();
+		
 		
 		if(endGame){
 			endGamepiecesObtained.add(piece);
 		}
 		
-		
-		logger.log(Level.CONFIG, "Pieces Mark: " + piecesMark);
-		
-		StringBuilder sb = new StringBuilder(pieces.length);
-		sb.append("Pieces: ");
-		for(int i = 0; i < pieces.length; i++) {
-			sb.append(pieces[i][0] + " ");
+		numPiecesObtained++;
+		double percentageComplete = (double)numPiecesObtained / totalNumPieces * 100;
+		if(percentageComplete > sortThreshold && sortThreshold < 100) {
+			sortThreshold += 10;
+			Arrays.parallelSort(pieces, (b, a) -> Integer.compare(b[1], a[1]));
+			logger.log(Level.CONFIG, "Sorted Pieces Array!, new threshold: " + sortThreshold + ", Num Pieces Obtained: " + numPiecesObtained);
 		}
-		logger.log(Level.CONFIG, sb.toString());
+		
+		this.updatePieceMark();
+		
+		if(logger.getLevel() == Level.CONFIG) {
+			logger.log(Level.CONFIG, "Percentage Complete: " + percentageComplete + ", Pieces Mark: " + piecesMark);
+			
+			StringBuilder sb = new StringBuilder(pieces.length);
+			sb.append("Pieces: ");
+			for(int i = 0; i < pieces.length; i++) {
+				sb.append(pieces[i][0] + "(" + pieces[i][1] + ") ");
+			}
+			logger.log(Level.CONFIG, sb.toString());
+		}
 	}
 	
 	private void updatePieceMark() {
 		while(piecesMark < pieces.length) {
-			if(pieces[piecesMark][0] == -1) {
+			if(pieces[piecesMark][1] == Integer.MIN_VALUE) {
 				piecesMark++;
 			} else {
 				break;
@@ -252,6 +282,17 @@ public class RarestFirst extends PiecePicker {
 	 * Stores the total amount of pieces needed.
 	 */
 	private int totalNumPieces;
+	
+	/**
+	 * Tracks the number of pieces obtained
+	 */
+	private int numPiecesObtained = 0;
+	
+	/**
+	 * Excluding 100%, when this percentage of the file has been reached the pieces array is sorted based on piece frequency from least to highest for optimisation purposes.  Namely, moving all the collected pieces to the front of
+	 * the array and allowing piecesMark to move past the collected pieces, meaning operations can then work only on pieces still in play 
+	 */
+	private int sortThreshold = 10;
 	
 	/**
 	 * An optimisation, this marker starts at 0 and moves up the pieces array when possible.  As it moves, everything behind it should be a gathered piece and everything ahead of it should be a 
