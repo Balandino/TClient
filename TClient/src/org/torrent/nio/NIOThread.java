@@ -43,7 +43,8 @@ import org.torrent.coredata.PiecePicker;
 import org.torrent.coredata.RarestFirst;
 
 /**
- * 
+ * This class runs as a new Thread and handles all the I/O operations as the client goes about its work.  Writing to file is also done from here and for managing connections the client
+ * takes a non-blocking I/O approach, making use of a selector.
  * @author mkg
  *
  */
@@ -568,7 +569,7 @@ public class NIOThread extends Thread {
 						channelData.setBlockObtained(offsetBytes, (int) torrentFile.getPieceSize(), blockReqSize);
 						
 						if(channelData.pieceComplete()) {
-							if(torrentFile.validatePiece(channelData.getBlocksCollected().array(), piece) == 0) {
+							if(torrentFile.validatePiece(channelData.getBlocksCollected().array(), piece)) {
 								PiecePicker picker = piecePickers.get(channelNioKey);
 									if(!picker.pieceAlreadyObtained(piece)) {//Check in place to prevent pieces overwriting each other in End Game mode
 										try (FileChannel fileChannel = (FileChannel) Files.newByteChannel(torrentFile.getOutputFileLocation(), EnumSet.of(StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.READ))){

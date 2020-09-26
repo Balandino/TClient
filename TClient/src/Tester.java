@@ -5,6 +5,11 @@ import java.nio.file.Paths;
 import org.torrent.bencoding.TorrentFile.PieceSelectionPolicy;
 import org.torrent.nio.TClient;
 
+/**
+ * 
+ * @author mkg
+ * Example class used to initiate and run a download
+ */
 public class Tester {
 
 	public static void main(String[] args) throws IOException {

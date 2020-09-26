@@ -7,6 +7,11 @@ import java.util.ArrayDeque;
 
 import org.torrent.coredata.FlowControls.ChannelStatus;
 
+/**
+ * This class holds information about the state of a channel, including information such as whether it is working on a piece, whether it is being choked and messages it needs to send 
+ * @author mkg
+ * 
+ */
 public class ChannelData {
 	
 	/**

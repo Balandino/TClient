@@ -5,15 +5,22 @@ import java.nio.file.Path;
 
 import org.torrent.bencoding.TorrentFile;
 import org.torrent.bencoding.TorrentFile.PieceSelectionPolicy;
-
+/**
+ * The façade class used to initiate a download for the client
+ * @author mkg
+ *
+ */
 public class TClient {
 	
 		
-	public TClient() {
-		
-	}
+	public TClient() {};
 	
-	
+	/**
+	 * The method used to initiate a download
+	 * @param pathToFile The Path to the .torrent file
+	 * @param newFileLocation The Path to where the target file should be downloaded to
+	 * @param piecePolicy The policy to use when downloading pieces
+	 */
 	public void downloadFile(Path pathToFile, Path newFileLocation, PieceSelectionPolicy piecePolicy) {
 		if (nio == null) {
 			nio = NIOThread.getInstance();
@@ -31,6 +38,8 @@ public class TClient {
 	
 	
 	
-	
+	/**
+	 * Used to implement singleton pattern on NIOThread
+	 */
 	private NIOThread nio = null;
 }

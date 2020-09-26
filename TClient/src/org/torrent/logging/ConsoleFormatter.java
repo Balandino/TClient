@@ -5,6 +5,11 @@ import java.util.Date;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
+/**
+ * A custom formatter that colours logs to make them more readable.  Requires an output device that can interpret ANSI codes
+ * @author mkg
+ *
+ */
 public class ConsoleFormatter extends Formatter {
 
 	@Override

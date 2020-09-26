@@ -5,7 +5,11 @@ import java.util.HashSet;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
+/**
+ * an implementation of PiecePicker, this class prioritises pieces based on their availability, with the rarest pieces being targetted first
+ * @author mkg
+ *
+ */
 public class RarestFirst extends PiecePicker {
 	
 	/**
@@ -227,6 +231,9 @@ public class RarestFirst extends PiecePicker {
 		}
 	}
 	
+	/**
+	 * Moves piecesMark forwards such that everything behind it should be an obtained piece and everything ahead should be a piece yet to be obtained
+	 */
 	private void updatePieceMark() {
 		while(piecesMark < pieces.length) {
 			if(pieces[piecesMark][1] == Integer.MIN_VALUE) {
