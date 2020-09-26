@@ -4,9 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 /**
- * 
- * @author mkg
  * This class represents information about Peers that the client may connect to 
+ * @author mkg
+ * 
  */
 public class Peer {
 	
@@ -70,7 +70,7 @@ public class Peer {
 	}
 
 	/**
-	 * 
+	 * Obtain a String representation of the reserved bytes of the peer's handshake, where each character in the string is a 1 or 0 to represent a bit
 	 * @param handshake Extracts the reserved bytes section of the handshake
 	 * @return A String where each digit represents a bit in the reserved bytes portion of the handshake
 	 */
@@ -84,7 +84,7 @@ public class Peer {
 	}
 	
 	/**
-	 * 
+	 * Obtain a Tring representation of the protocol referenced in this p[eer's handshake
 	 * @param handshake Returns the protocol described in the received handshake
 	 * @return A string representing the peer's desired protocol
 	 */
@@ -132,7 +132,10 @@ public class Peer {
 	public void processHave(int piece) {
 			BitfieldOperations.setBit(piece, bitfield, true);
 	}
-
+	
+	/**
+	 * Prints this peer's IP address and port number
+	 */
 	@Override
 	public String toString() {
 		return String.format("%-15s %s%s", this.getIP(), this.getPort(), System.lineSeparator());

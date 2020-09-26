@@ -3,6 +3,11 @@ package org.torrent.coredata;
 import java.util.LinkedList;
 import java.util.List;
 
+/**
+ * This class acts as a container for Peer objects, storing and distributing them when required
+ * @author mkg
+ *
+ */
 public class PeerManager {
 	
 	/**
@@ -41,13 +46,16 @@ public class PeerManager {
 	}
 	
 	/**
-	 * 
+	 * Confirms the amount of peers that are available to try and connect to
 	 * @return The amount of available peers
 	 */
 	public int numAvailablePeers() {
 		return peers.size();
 	}
 	
+	/**
+	 * Prints all the peers contained within this instance
+	 */
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder("Peers" + System.lineSeparator() + "====================" + System.lineSeparator());
