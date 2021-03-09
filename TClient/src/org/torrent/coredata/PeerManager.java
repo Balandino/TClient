@@ -13,9 +13,7 @@ public class PeerManager {
 	/**
 	 * Constructor
 	 */
-	public PeerManager() {
-		
-	}
+	public PeerManager() {};
 	
 	/**
 	 * Adds a new peer to the manager's internal linked list.

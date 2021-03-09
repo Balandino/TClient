@@ -71,7 +71,7 @@ public class NIOThread extends Thread {
 	        newHandler.setFormatter(new ConsoleFormatter());
 	        logger.addHandler(newHandler);
 	        
-	        FileHandler fileHandler = new FileHandler("./Logs/Logs.txt");
+	        FileHandler fileHandler = new FileHandler("../Logs/Logs.txt");
 	        fileHandler.setFormatter(new FileFormatter());
 	        logger.addHandler(fileHandler);
 			
