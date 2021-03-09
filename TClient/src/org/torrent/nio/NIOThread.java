@@ -71,9 +71,13 @@ public class NIOThread extends Thread {
 	        newHandler.setFormatter(new ConsoleFormatter());
 	        logger.addHandler(newHandler);
 	        
+	        
+	        /*
+	        * Uncomment and set for a log file
 	        FileHandler fileHandler = new FileHandler("../Logs/Logs.txt");
 	        fileHandler.setFormatter(new FileFormatter());
 	        logger.addHandler(fileHandler);
+	        */
 			
 			//Create an id for our client
 			peerID = this.getSessionPeerID();

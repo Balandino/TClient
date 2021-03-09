@@ -19,13 +19,13 @@ public class Tester {
 		TClient client = new TClient();
 		
 		
-		if(args.length < 1) {
-			System.out.println("Error: No torrent supplied!");
+		if(args.length < 2) {
+			System.out.println("Error: Torrent file and output location needed!");
 		} else {
 			// Remove previous output
-			Files.deleteIfExists(Paths.get("./Output/Debian-ISO.iso"));
+			// Files.deleteIfExists(Paths.get("./Output/Debian-ISO.iso"));
 			
-			client.downloadFile(Paths.get(args[0]), Paths.get("../Output/Debian-ISO.iso"), PieceSelectionPolicy.RarestFirst);
+			client.downloadFile(Paths.get(args[0]), Paths.get(args[1]), PieceSelectionPolicy.RarestFirst);
 			//client.downloadFile(Paths.get("./Debian ISO/debian-10.4.0-amd64-netinst.iso.torrent"), Paths.get("./Output/Debian-ISO.iso"), PieceSelectionPolicy.RarestFirst);
 
 		}

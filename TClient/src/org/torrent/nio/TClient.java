@@ -33,7 +33,6 @@ public class TClient {
 			System.err.println("Unable to parse torrent file");
 			e.printStackTrace();
 		}
-		
 	}
 	
 	
