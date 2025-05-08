@@ -6,4 +6,4 @@ The code is initiated by calling the Tester class and supplying an appropriate t
 ![Image showing how to start the TClient program](/TClient/Screenshots/Beginning.png?raw=true "Initiate Download")
 ![Image showing the ending if the TClient program](/TClient/Screenshots/Ending.png?raw=true "Download Concluded")
 
-Note that the code is based on version one of the specificaiton with no extensions added.  Due to this it will work on files using a more classical version of the specification, such as a Debian ISO, but files such as an Arch Linux ISO use different methods of download which aren't currently supported by TClient.
+Note that the code is based on version 1 of the specification, with no extensions added.  Due to this it will work on files using a more classical version of the specification, such as a Debian ISO, but files such as an Arch Linux ISO use different methods of download which aren't currently supported by TClient.
